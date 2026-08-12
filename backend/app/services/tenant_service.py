@@ -29,9 +29,9 @@ def initialize_tenant_defaults(db: Session, company_id: UUID):
     # 2. Default Payment Methods
     default_payment_methods = [
         {"name": "Crédito Interno", "key": "credito_interno", "icon": "user-check", "description": "Línea de crédito para clientes", "is_active": True},
-        {"name": "Transferencia", "key": "TRANSFERENCIA", "icon": "smartphone", "description": "Transferencia electrónica bancaria", "is_active": True},
-        {"name": "Tarjeta", "key": "TARJETA", "icon": "credit-card", "description": "Crédito o Débito (Transbank/Otros)", "is_active": True},
-        {"name": "Efectivo", "key": "EFECTIVO", "icon": "wallet", "description": "Pago en efectivo moneda nacional", "is_active": True},
+        {"name": "Transferencia", "key": "transferencia", "icon": "smartphone", "description": "Transferencia electrónica bancaria", "is_active": True},
+        {"name": "Tarjeta", "key": "tarjeta", "icon": "credit-card", "description": "Crédito o Débito (Transbank/Otros)", "is_active": True},
+        {"name": "Efectivo", "key": "efectivo", "icon": "wallet", "description": "Pago en efectivo moneda nacional", "is_active": True},
     ]
 
     for pm_data in default_payment_methods:

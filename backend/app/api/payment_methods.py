@@ -49,11 +49,11 @@ def create_payment_method(
     db: TenantSession = Depends(get_tenant_session),
     current_user = Depends(check_roles(["admin"]))
 ):
-    existing = db.tenant_query(PaymentMethodConfig).filter(PaymentMethodConfig.key == data.key).first()
+    existing = db.tenant_query(PaymentMethodConfig).filter(PaymentMethodConfig.key == data.key.lower()).first()
     if existing:
         raise HTTPException(status_code=400, detail="Ya existe un método con esa clave")
     
-    pm = PaymentMethodConfig(**data.model_dump())
+    pm = PaymentMethodConfig(**{**data.model_dump(), "key": data.key.lower()})
     db.tenant_add(pm)
     db.commit()
     db.refresh(pm)

@@ -5,13 +5,16 @@ export function usePaymentMethods() {
   const { data, error, isLoading, mutate } = useSWR("/payment-methods/", () => apiService.getPaymentMethods());
 
   // Adapt backend data to frontend PaymentMethod interface
-  const mappedMethods = data?.map((m: any) => ({
+  const mappedMethods = data?.map((m: any) => {
+    const keyLower = (m.key || "").toLowerCase();
+    return {
     id: m.id,
     name: m.name,
-    key: m.key,
+    key: keyLower,
     icon: m.icon,
-    type: m.key === "efectivo" ? "cash" : (m.key === "tarjeta" ? "card" : (m.key === "transferencia" ? "transfer" : "custom"))
-  }));
+    type: keyLower === "efectivo" ? "cash" : (keyLower === "tarjeta" ? "card" : (keyLower === "transferencia" ? "transfer" : "custom"))
+    }
+  });
 
   return {
     data: mappedMethods,
