@@ -1,6 +1,7 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.api import (
     auth, pos, inventory, purchases, customers,
@@ -9,7 +10,7 @@ from app.api import (
     printing, branches, expenses, payment_methods,
     superadmin, companies
 )
-import os
+import os, traceback
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -116,6 +117,22 @@ def startup_event():
             if retries == 0:
                 raise RuntimeError("Critical Error: Cannot connect to PostgreSQL")
             time.sleep(2)
+
+# ─── Debug: catch all 500s and return the real error ───────────────────────
+@app.exception_handler(Exception)
+async def debug_exception_handler(request: Request, exc: Exception):
+    tb = traceback.format_exc()
+    print(f"[500 ERROR] {request.method} {request.url.path} → {exc}")
+    print(tb)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": str(exc),
+            "type": type(exc).__name__,
+            "path": str(request.url.path),
+            "traceback": tb.split("\n")[-5:],  # last 5 lines
+        },
+    )
 
 @app.get("/api/health")
 def health_check():
