@@ -143,6 +143,9 @@ class InventoryService:
                     min_stock=product.min_stock,
                     is_active=product.is_active,
                     location_id=to_location_id,
+                    branch_id=product.branch_id,
+                    is_scrap=product.is_scrap,
+                    scrap_parent_id=product.scrap_parent_id,
                     stock_quantity=quantity
                 )
                 self.db.add(new_product)
