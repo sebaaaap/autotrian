@@ -245,15 +245,22 @@ class POSService:
                         detail=f"La suma de pagos ({total_payments}) no coincide con el total esperado ({total})"
                     )
 
+                # Payment method label for the ticket: dynamic, no enum forcing
+                def _pm_str(pm):
+                    """Extract the string value from a payment method, whether it's an enum or plain string."""
+                    if hasattr(pm, 'value'):
+                        return pm.value
+                    return str(pm)
+
+                ticket_payment_method = "mixto" if len(sale_data.payments) > 1 else _pm_str(sale_data.payments[0].payment_method)
+
                 ticket = Ticket(
                     ticket_number=POSService.generate_ticket_number(db),
                     state=SaleState.DRAFT,
                     subtotal=subtotal,
                     tax_amount=tax_amount,
                     total_amount=total,
-                    payment_method="MIXED" if len(sale_data.payments) > 1 else (
-                        sale_data.payments[0].payment_method.value if hasattr(sale_data.payments[0].payment_method, 'value') else sale_data.payments[0].payment_method
-                    ),
+                    payment_method=ticket_payment_method,
                     session_id=sale_data.session_id,
                     customer_id=getattr(sale_data, "customer_id", None),
                     vehicle_id=getattr(sale_data, "vehicle_id", None),
@@ -285,16 +292,11 @@ class POSService:
                     db.add(sale_item)
 
                 for payment_data in sale_data.payments:
-                    try:
-                        pm_name = payment_data.payment_method.name if hasattr(payment_data.payment_method, 'name') else payment_data.payment_method.upper()
-                        pm_enum = PaymentMethod[pm_name]
-                    except (KeyError, AttributeError):
-                        pm_val = payment_data.payment_method.value if hasattr(payment_data.payment_method, 'value') else payment_data.payment_method
-                        pm_enum = next((m for m in PaymentMethod if m.value == pm_val), PaymentMethod.CASH)
+                    pm_str = _pm_str(payment_data.payment_method)
 
                     payment = Payment(
                         ticket_id=ticket.id,
-                        payment_method=pm_enum.value,  # Guardar el string, no el objeto enum
+                        payment_method=pm_str,  # Dynamic string, stored as-is
                         amount=payment_data.amount,
                         reference=payment_data.reference
                     )
@@ -341,16 +343,14 @@ class POSService:
             session = db.tenant_query(CashSession).filter(CashSession.id == ticket.session_id).first()
             if session:
                 for payment in ticket.payments:
-                    # Usamos .name para obtener CASH, CARD, etc. o .value para efectivo, tarjeta
-                    pm_name = payment.payment_method.name if hasattr(payment.payment_method, "name") else str(payment.payment_method).upper()
+                    pm = str(payment.payment_method).lower()
                     
-                    if "CASH" in pm_name or "EFECTIVO" in pm_name.upper():
+                    if "efectivo" in pm or "cash" in pm:
                         session.total_sales_cash += payment.amount
-                        # Sincronizamos expected_balance (efectivo esperado)
                         session.expected_balance = session.opening_balance + session.total_sales_cash
-                    elif "CARD" in pm_name or "TARJETA" in pm_name.upper():
+                    elif "tarjeta" in pm or "card" in pm:
                         session.total_sales_card += payment.amount
-                    elif "TRANSFER" in pm_name or "TRANSFERENCIA" in pm_name.upper():
+                    elif "transfer" in pm or "transferencia" in pm:
                         session.total_sales_transfer += payment.amount
         
         db.commit()
@@ -578,17 +578,16 @@ class POSService:
                 # Simplemente lo sumamos (lo cual restará del acumulado positivo).
                 # Nota: Si era mixto, aquí simplificamos usando el método principal 
                 # o prorrateando. Por ahora usamos el proporcional si es un solo método.
-                main_method = original_ticket.payment_method
-                if main_method == "efectivo":
+                main_method = str(original_ticket.payment_method).lower()
+                if "efectivo" in main_method or "cash" in main_method:
                     session.total_sales_cash += credit_note.total_amount
-                    # Re-sincronizar expected_balance
                     session.expected_balance = session.opening_balance + session.total_sales_cash
-                elif main_method == "tarjeta":
+                elif "tarjeta" in main_method or "card" in main_method:
                     session.total_sales_card += credit_note.total_amount
-                elif main_method == "transferencia":
+                elif "transfer" in main_method or "transferencia" in main_method:
                     session.total_sales_transfer += credit_note.total_amount
                 else:
-                    # Si es MIXTO, restamos del proporcional (simplificado al efectivo por ahora)
+                    # Método dinámico (ej: "fua") — restamos del proporcional de efectivo por ahora
                     session.total_sales_cash += credit_note.total_amount
                     session.expected_balance = session.opening_balance + session.total_sales_cash
 
