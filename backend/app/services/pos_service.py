@@ -508,61 +508,61 @@ class POSService:
                             stock_before=stock_before,
                             stock_after=stock_after
                         )
-                else:
-                    # ── MERMA (no regresa al stock útil) ────────────────────────
-                    # Buscamos o creamos el Pasillo Mermas
-                    merma_location = db.tenant_query(StorageLocation).filter(
-                        StorageLocation.name == "Pasillo Mermas",
-                        StorageLocation.branch_id == original_ticket.branch_id
-                    ).first()
-                    if not merma_location:
-                        merma_location = StorageLocation(
-                            name="Pasillo Mermas",
-                            zone="Virtual",
-                            path="Virtual/Mermas",
-                            allows_multiple_products=True,
-                            branch_id=original_ticket.branch_id
+                    else:
+                        # ── MERMA (no regresa al stock útil) ────────────────────────
+                        # Buscamos o creamos el Pasillo Mermas
+                        merma_location = db.tenant_query(StorageLocation).filter(
+                            StorageLocation.name == "Pasillo Mermas",
+                            StorageLocation.branch_id == original_ticket.branch_id
+                        ).first()
+                        if not merma_location:
+                            merma_location = StorageLocation(
+                                name="Pasillo Mermas",
+                                zone="Virtual",
+                                path="Virtual/Mermas",
+                                allows_multiple_products=True,
+                                branch_id=original_ticket.branch_id
+                            )
+                            db.add(merma_location)
+                            db.flush()
+
+                        # Buscamos si ya hay un "twin" del producto destino en merma
+                        merma_product = db.tenant_query(Product).filter(
+                            Product.barcode == target_product.barcode,
+                            Product.location_id == merma_location.id
+                        ).first()
+
+                        if not merma_product:
+                            # Creamos gemelo en Pasillo Mermas con stock inicial 0
+                            merma_product = Product(
+                                name=target_product.name,
+                                barcode=target_product.barcode,
+                                price=target_product.price,
+                                cost=target_product.cost,
+                                uom=target_product.uom,
+                                product_type=target_product.product_type,
+                                category_id=target_product.category_id,
+                                location_id=merma_location.id,
+                                stock_quantity=0,
+                                is_active=True,
+                                branch_id=original_ticket.branch_id
+                            )
+                            db.add(merma_product)
+                            db.flush()
+
+                        # Movemos al Pasillo Mermas
+                        merma_product.stock_quantity += target_quantity
+                        stock_after = stock_before  # El stock útil original no cambia al enviar a merma
+
+                        movement_item = InventoryMovementItem(
+                            movement_id=movement.id,
+                            product_id=target_product.id,
+                            quantity=-target_quantity,         # negativo = sale como merma
+                            stock_before=stock_before,
+                            stock_after=stock_after
                         )
-                        db.add(merma_location)
-                        db.flush()
 
-                    # Buscamos si ya hay un "twin" del producto destino en merma
-                    merma_product = db.tenant_query(Product).filter(
-                        Product.barcode == target_product.barcode,
-                        Product.location_id == merma_location.id
-                    ).first()
-
-                    if not merma_product:
-                        # Creamos gemelo en Pasillo Mermas con stock inicial 0
-                        merma_product = Product(
-                            name=target_product.name,
-                            barcode=target_product.barcode,
-                            price=target_product.price,
-                            cost=target_product.cost,
-                            uom=target_product.uom,
-                            product_type=target_product.product_type,
-                            category_id=target_product.category_id,
-                            location_id=merma_location.id,
-                            stock_quantity=0,
-                            is_active=True,
-                            branch_id=original_ticket.branch_id
-                        )
-                        db.add(merma_product)
-                        db.flush()
-
-                    # Movemos al Pasillo Mermas
-                    merma_product.stock_quantity += target_quantity
-                    stock_after = stock_before  # El stock útil original no cambia al enviar a merma
-
-                    movement_item = InventoryMovementItem(
-                        movement_id=movement.id,
-                        product_id=target_product.id,
-                        quantity=-target_quantity,         # negativo = sale como merma (conceptualmente)
-                        stock_before=stock_before,
-                        stock_after=stock_after
-                    )
-
-                db.add(movement_item)
+                    db.add(movement_item)
         
         # Marcar ticket original como reembolsado
         original_ticket.is_refunded = True
