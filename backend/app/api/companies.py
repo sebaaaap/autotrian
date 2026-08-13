@@ -60,9 +60,12 @@ def upload_my_logo(
     current_user: User = Depends(get_current_user)
 ):
     if not current_user.company_id:
-        raise HTTPException(status_code=400, detail="El usuario no tiene una empresa asociada")
+        # Superadmin: allow uploading to a specific company via query param
+        from uuid import UUID
+        from fastapi import Query
+        raise HTTPException(status_code=400, detail="El usuario no tiene una empresa asociada. Use el panel de superadmin.")
     
-    if str(current_user.role.value) != "admin":
+    if str(current_user.role.value) not in ("admin", "superadmin"):
         raise HTTPException(status_code=403, detail="Permisos insuficientes")
 
     from app.core.config import settings
