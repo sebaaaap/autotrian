@@ -381,24 +381,6 @@ def update_purchase(
                 unit_cost=item.unit_cost,
                 subtotal=item.quantity * item.unit_cost
             )
-    return PurchaseResponse(
-        id=purchase.id,
-        date_created=purchase.date_created,
-        supplier_id=purchase.supplier_id,
-        invoice_number=purchase.invoice_number,
-        subtotal_net=purchase.subtotal_net,
-        tax_amount=purchase.tax_amount,
-        total_cost=purchase.total_cost,
-        state=purchase.state.name,
-        notes=purchase.notes,
-        items=[
-            PurchaseItemResponse(
-                id=item.id,
-                product_id=item.product_id,
-                quantity=item.quantity,
-                unit_cost=item.unit_cost,
-                subtotal=item.quantity * item.unit_cost
-            )
             for item in purchase.items
         ]
     )
