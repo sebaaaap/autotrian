@@ -115,7 +115,8 @@ def build_report_html(
     company_name: str,
     period_label: str,
     start_dt: datetime,
-    end_dt: datetime
+    end_dt: datetime,
+    logo_url: str = None
 ) -> str:
     """
     Construye el HTML del reporte con todas las secciones:
@@ -183,6 +184,7 @@ def build_report_html(
 
             <!-- Header -->
             <div style="background:linear-gradient(135deg,#1e293b 0%,#334155 100%);padding:28px 24px;text-align:center;">
+                {f'<img src="{logo_url}" alt="{company_name}" style="max-height:56px;max-width:200px;margin:0 auto 8px auto;display:block;object-fit:contain;"/>' if logo_url else ''}
                 <h1 style="color:#ffffff;margin:0 0 4px 0;font-size:22px;font-weight:700;">{company_name}</h1>
                 <p style="color:#94a3b8;margin:0;font-size:13px;">Reporte {period_label}</p>
                 <p style="color:#64748b;margin:4px 0 0 0;font-size:11px;">
@@ -297,7 +299,13 @@ def send_report_email(
         raise HTTPException(status_code=500, detail="RESEND_API_KEY no configurada")
 
     start_dt, end_dt, label = get_period_dates(period)
-    html = build_report_html(db, company_id, company_name, label, start_dt, end_dt)
+
+    # Obtener logo de la empresa
+    from app.models.base import Company
+    company = db.query(Company).filter(Company.id == company_id).first()
+    logo_url = company.logo_url if company else None
+
+    html = build_report_html(db, company_id, company_name, label, start_dt, end_dt, logo_url)
 
     # Enviar via Resend API
     resp = requests.post(
