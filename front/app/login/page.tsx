@@ -27,35 +27,35 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-[#279436] relative overflow-hidden p-6 text-slate-800">
-            {/* Background Ambient Glows */}
-            <div className="absolute -top-32 -left-32 w-96 h-96 bg-[#1a6b27]/30 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-[#1a6b27]/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 relative overflow-hidden p-6 text-slate-800">
+            {/* Background Accent Glows */}
+            <div className="absolute -top-32 -left-32 w-96 h-96 bg-[#eb1914]/5 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-[#eb1914]/5 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute inset-0 bg-[radial-gradient(#eb1914_0.6px,transparent_0.6px)] [background-size:24px_24px] opacity-[0.05] -z-10" />
 
-            {/* Layout: login card + dino video lado a lado */}
-            <div className="flex items-stretch gap-0 relative z-10 animate-in fade-in duration-500">
-
-                {/* Columna izquierda: logo + card + footer */}
-                <div className="w-full max-w-md relative">
-                    {/* Logo y Título */}
-                    <div className="text-center mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
-                        <div className="inline-flex items-center justify-center p-3 mb-3">
-                            <img
-                                src="/logoaouto.png"
-                                alt="Logo Autotrian"
-                                className="max-h-28 w-auto object-contain drop-shadow-[0_8px_16px_rgba(0,0,0,0.3)]"
-                            />
-                        </div>
-                        <h1 className="text-3xl font-black tracking-tight text-white mb-1 uppercase">
-                            VKI
-                        </h1>
-                        <p className="text-xs text-white/80 font-semibold tracking-wider uppercase">
-                            Sistema de Punto de Venta e Inventario
-                        </p>
+            {/* Contenedor Principal Centrado */}
+            <div className="w-full max-w-md relative z-10">
+                {/* Logo y Título */}
+                <div className="text-center mb-6 animate-in fade-in slide-in-from-top-4 duration-500">
+                    <div className="inline-flex items-center justify-center p-2 mb-2">
+                        <img
+                            src="/logoaouto.png"
+                            alt="Logo Autotrian"
+                            className="max-h-28 w-auto object-contain drop-shadow-[0_4px_12px_rgba(235,25,20,0.15)]"
+                        />
                     </div>
+                    <h1 className="text-3xl font-black tracking-tight text-slate-900 mb-1 uppercase">
+                        VKI
+                    </h1>
+                    <p className="text-xs text-slate-500 font-semibold tracking-wider uppercase">
+                        Sistema de Punto de Venta e Inventario
+                    </p>
+                </div>
 
-                    {/* Card de Login */}
-                    <div className="bg-white/95 backdrop-blur-2xl rounded-l-3xl rounded-r-none shadow-2xl shadow-black/30 border border-slate-200/90 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
+                {/* Wrapper de la Card + Dino apoyado */}
+                <div className="relative">
+                    {/* Card de Login Centrada */}
+                    <div className="bg-white rounded-3xl shadow-2xl shadow-slate-200/90 border border-slate-200/90 overflow-hidden relative z-10 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
                         <div className="p-8">
                             <div className="mb-6">
                                 <h2 className="text-xl font-extrabold text-slate-900">Iniciar Sesión</h2>
@@ -152,24 +152,26 @@ export default function LoginPage() {
                         </div>
                     </div>
 
-                    {/* Footer */}
-                    <div className="text-center mt-6 text-xs text-white/70 animate-in fade-in duration-500 delay-200">
-                        <p>© 2026 VKI. Sistema de Gestión Empresarial.</p>
-                        <p className="mt-1 font-semibold text-white/60">Powered by VankaiLabs</p>
-                    </div>
+                    {/* Dino Mascota apoyado en la Card en pantallas medianas/grandes */}
+                    <video
+                        autoPlay
+                        muted
+                        loop
+                        playsInline
+                        className="hidden lg:block absolute -top-[45px] -right-[230px] w-[310px] h-auto object-contain pointer-events-none z-20"
+                    >
+                        <source src="/dinoparao_transparent.webm" type="video/webm" />
+                        <source src="/dinoparao.mp4" type="video/mp4" />
+                    </video>
                 </div>
 
-                {/* Dino Video - pegado al lado derecho de la card, misma altura */}
-                <video
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    className="w-[200px] sm:w-[260px] md:w-[300px] max-h-[520px] object-cover rounded-r-3xl rounded-l-none shadow-2xl shadow-black/30 pointer-events-none self-stretch"
-                >
-                    <source src="/dinoparao.mp4" type="video/mp4" />
-                </video>
+                {/* Footer */}
+                <div className="text-center mt-6 text-xs text-slate-500 animate-in fade-in duration-500 delay-200">
+                    <p>© 2026 VKI. Sistema de Gestión Empresarial.</p>
+                    <p className="mt-1 font-semibold text-slate-400">Powered by VankaiLabs</p>
+                </div>
             </div>
         </div>
     );
 }
+
