@@ -360,9 +360,12 @@ class ProductAggregatedResponse(BaseModel):
 
 def heal_orphaned_products(db: TenantSession):
     try:
-        orphans = db._db.query(Product).filter(
+        orphans = db._db.query(Product).options(
+            joinedload(Product.location)
+        ).filter(
             (Product.company_id == None) | (Product.branch_id == None)
-        ).all()
+        ).limit(50).all()
+
         if not orphans:
             return
         

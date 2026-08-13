@@ -22,6 +22,7 @@ app = FastAPI(
 ALWAYS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:3001",
+    "https://autotrian.vercel.app",
     "https://saas-self-alpha-78.vercel.app",
     "https://saas-git-main-sebaaaps-projects.vercel.app",
     "https://saas-c4br9u9tg-sebaaaps-projects.vercel.app",
@@ -29,15 +30,13 @@ ALWAYS_ALLOWED_ORIGINS = [
 
 env_origins = [str(o) for o in settings.CORS_ORIGINS] if settings.CORS_ORIGINS else []
 
-# Si el env tiene "*" o está vacío, usar wildcard; si no, combinar ambas listas
 if "*" in env_origins or not env_origins:
     origins = ["*"]
 else:
     origins = list(set(env_origins + ALWAYS_ALLOWED_ORIGINS))
 
-# Convert wildcards like "https://*.vercel.app" to regex for Starlette CORSMiddleware
 clean_origins = []
-origin_regex_list = []
+origin_regex_list = [r"https://.*\.vercel\.app"]
 for origin in origins:
     if "*" in origin and origin != "*":
         import re
