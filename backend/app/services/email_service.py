@@ -315,7 +315,7 @@ def send_report_email(
             "Content-Type": "application/json",
         },
         json={
-            "from": "Autotrian Reports <reports@resend.dev>",
+            "from": "Autotrian <onboarding@resend.dev>",
             "to": recipient_emails,
             "subject": f"📊 Reporte {label} — {company_name} ({start_dt.strftime('%d/%m')})",
             "html": html,
