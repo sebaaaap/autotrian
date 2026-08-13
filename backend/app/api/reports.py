@@ -1501,9 +1501,14 @@ def send_email_report(
 
     company_id = current_user.company_id
     if not company_id:
-        raise HTTPException(status_code=400, detail="Usuario sin empresa asignada")
+        # Superadmin sin empresa: usar la primera empresa disponible
+        company = db.query(Company).order_by(Company.created_at.desc()).first()
+        if not company:
+            raise HTTPException(status_code=400, detail="No hay empresas creadas aún")
+        company_id = company.id
+    else:
+        company = db.query(Company).filter(Company.id == company_id).first()
 
-    company = db.query(Company).filter(Company.id == company_id).first()
     company_name = company.name if company else "Mi Empresa"
 
     # Determinar destinatarios
