@@ -1,0 +1,347 @@
+\documentclass[a4paper,11pt]{article}
+
+% =========================================================
+% PAQUETES
+% =========================================================
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+
+\usepackage[
+    paperwidth=21cm,
+    paperheight=29.7cm,
+    margin=0cm
+]{geometry}
+
+\usepackage{graphicx}
+\usepackage[table]{xcolor} % xcolor con soporte para tablas
+\usepackage{tikz}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{colortbl}
+\usepackage{helvet}
+\usepackage{ragged2e}
+\usepackage{eso-pic}
+
+\renewcommand{\familydefault}{\sfdefault}
+
+% =========================================================
+% COLORES
+% =========================================================
+
+\definecolor{autonegro}{RGB}{34,31,32}
+\definecolor{autorojo}{RGB}{235,25,20}
+\definecolor{gristexto}{RGB}{35,35,35}
+
+% =========================================================
+% CONFIGURACIÓN
+% =========================================================
+
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\tabcolsep}{0pt}
+
+% =========================================================
+% DATOS
+% =========================================================
+
+\newcommand{\FechaCotizacion}{12/08/2026}
+\newcommand{\AutoCliente}{Toyota Yaris 2020}
+
+% =========================================================
+% DATOS EMPRESA
+% =========================================================
+
+\newcommand{\NombreEmpresa}{Autotrian}
+\newcommand{\DireccionEmpresa}{Promoncaes 1403 Renca}
+\newcommand{\MailEmpresa}{pastrianfernando@gmail.com}
+\newcommand{\TelefonoEmpresa}{+569 48481417}
+
+% =========================================================
+% INFORMACIÓN ADICIONAL
+% =========================================================
+
+\newcommand{\FormaPago}{Transferencia / Efectivo / Tarjetas}
+
+\newcommand{\NotaCotizacion}{%
+Valores sujetos a revisión del vehículo.%
+}
+
+% =========================================================
+% FONDO CON TIKZ (DISEÑO Y LOGOS REUBICADOS)
+% =========================================================
+
+\AddToShipoutPictureBG*{%
+\begin{tikzpicture}[
+    remember picture,
+    overlay
+]
+
+% 1. FONDO BASE BLANCO
+\fill[white]
+    (current page.south west)
+    rectangle
+    (current page.north east);
+
+% 2. FIGURA ROJA SUPERIOR (ESQUINA DERECHA)
+\fill[autorojo]
+    ([xshift=9cm,yshift=-1.1cm]current page.north west)
+    .. controls ([xshift=13cm,yshift=-0.9cm]current page.north west)
+           and ([xshift=17cm,yshift=-1.6cm]current page.north west) ..
+    ([xshift=21cm,yshift=-3.8cm]current page.north west)
+    -- (current page.north east)
+    -- cycle;
+
+% 3. FRANJA NEGRA SUPERIOR (DOMINANTE IZQUIERDA)
+\fill[autonegro]
+    (current page.north west)
+    -- ([yshift=-6.5cm]current page.north west)
+    .. controls ([xshift=3.8cm,yshift=-3.55cm]current page.north west)
+           and ([xshift=5.5cm,yshift=-3.15cm]current page.north west) ..
+    ([xshift=8.2cm,yshift=-2.45cm]current page.north west)
+    .. controls ([xshift=12.5cm,yshift=-1.15cm]current page.north west)
+           and ([xshift=18.0cm,yshift=-0.95cm]current page.north west) ..
+    ([xshift=21cm,yshift=-0.8cm]current page.north west)
+    -- (current page.north east)
+    -- cycle;
+
+% 4. FIGURA ROJA INFERIOR (REFLEJADA - ESQUINA IZQUIERDA)
+\fill[autorojo]
+    ([xshift=12cm,yshift=1.1cm]current page.south west)
+    .. controls ([xshift=8cm,yshift=0.9cm]current page.south west)
+           and ([xshift=4cm,yshift=1.6cm]current page.south west) ..
+    ([xshift=0cm,yshift=3.8cm]current page.south west)
+    -- (current page.south west)
+    -- cycle;
+
+% 5. FRANJA NEGRA INFERIOR (REFLEJADA - DOMINANTE DERECHA)
+\fill[autonegro]
+    (current page.south east)
+    -- ([xshift=21cm,yshift=6.5cm]current page.south west)
+    .. controls ([xshift=17.2cm,yshift=3.55cm]current page.south west)
+           and ([xshift=15.5cm,yshift=3.15cm]current page.south west) ..
+    ([xshift=12.8cm,yshift=2.45cm]current page.south west)
+    .. controls ([xshift=8.5cm,yshift=1.15cm]current page.south west)
+           and ([xshift=3.0cm,yshift=0.95cm]current page.south west) ..
+    ([xshift=0cm,yshift=0.8cm]current page.south west)
+    -- (current page.south west)
+    -- cycle;
+
+% =========================================================
+% UBICACIÓN DE LOGOS
+% =========================================================
+
+% A) LOGO SUPERIOR (DESPLAZADO A LA IZQUIERDA Y ABAJO EN LA ZONA BLANCA)
+\node[anchor=center, inner sep=0pt] at ([xshift=-6.8cm,yshift=-3.2cm]current page.north east) {
+    % PARA USAR TU LOGO REAL: Reemplaza la línea de abajo por:
+    % \includegraphics[width=4.8cm]{logo.png}
+    \includegraphics[width=6.5cm]{logoaouto.png}
+    % \tikz\node[draw=autorojo, fill=white, line width=1pt, rounded corners=4pt, inner sep=8pt, text=autonegro]{\small\bfseries [LOGO PRINCIPAL]};
+};
+
+% B) LOGO MARCA DE AGUA (DESPLAZADO A LA DERECHA, LIBRE DE TEXTO Y FRANJAS)
+\node[opacity=0.12, inner sep=0pt, anchor=center] at ([xshift=-6.8cm,yshift=6.6cm]current page.south east) {
+    % PARA USAR TU MARCA DE AGUA REAL: Reemplaza la línea de abajo por:
+    \includegraphics[width=6.5cm]{logoaouto.png}
+    % \tikz\node[minimum width=5.5cm, minimum height=2.5cm, draw=gray, dashed, inner sep=8pt, text=gray]{\bfseries [MARCA DE AGUA]};
+};
+
+\end{tikzpicture}%
+}
+
+% =========================================================
+% DOCUMENTO
+% =========================================================
+
+\begin{document}
+
+% =========================================================
+% ENCABEZADO
+% =========================================================
+
+\vspace*{3.8cm}
+
+\begin{center}
+
+{\fontsize{29}{32}\selectfont
+\bfseries\color{autonegro}
+Cotización
+}
+
+\end{center}
+
+% =========================================================
+% DATOS DEL VEHÍCULO
+% =========================================================
+
+\vspace{0.4cm}
+
+\begin{center}
+
+\begin{minipage}{16.9cm}
+
+{\fontsize{13}{15}\selectfont
+\bfseries\color{autonegro} Fecha:
+}
+\hspace{0.25cm}
+{\fontsize{13}{15}\selectfont
+\FechaCotizacion
+}
+
+\vspace{0.12cm}
+
+{\fontsize{13}{15}\selectfont
+\bfseries\color{autonegro} Auto:
+}
+\hspace{0.32cm}
+{\fontsize{13}{15}\selectfont
+\AutoCliente
+}
+
+\end{minipage}
+
+\end{center}
+
+\vspace{0.25cm}
+
+% =========================================================
+% TABLA DE PRODUCTOS
+% =========================================================
+
+\begin{center}
+
+\begin{tabularx}{17.0cm}{
+    >{\raggedright\arraybackslash}X
+    >{\centering\arraybackslash}p{1.65cm}
+    >{\centering\arraybackslash}p{2.55cm}
+    >{\centering\arraybackslash}p{2.55cm}
+    >{\centering\arraybackslash}p{2.65cm}
+}
+
+% CABECERA DE TABLA
+\rowcolor{autonegro}
+\color{white}\fontsize{9.3}{10}\selectfont\bfseries DESCRIPCIÓN &
+\color{white}\fontsize{9.3}{10}\selectfont\bfseries UNIDADES &
+\color{white}\fontsize{9.3}{10}\selectfont\bfseries PRECIO &
+\color{white}\fontsize{9.3}{10}\selectfont\bfseries IVA (19\%) &
+\color{white}\fontsize{9.3}{10}\selectfont\bfseries TOTAL \\[0.15cm]
+
+% PRODUCTOS
+\fontsize{10.8}{13}\selectfont Pastillas de freno delanteras & 1 & \$45.000 & \$8.550 & \$53.550 \\[0.17cm]
+\fontsize{10.8}{13}\selectfont Aceite sintético 5W-30 & 4 & \$12.000 & \$9.120 & \$57.120 \\[0.17cm]
+\fontsize{10.8}{13}\selectfont Filtro de aceite & 1 & \$8.500 & \$1.615 & \$10.115 \\[0.17cm]
+\fontsize{10.8}{13}\selectfont Mano de obra instalación & 1 & \$30.000 & \$5.700 & \$35.700 \\
+
+\end{tabularx}
+
+\end{center}
+
+% =========================================================
+% BLOQUE DE TOTALES
+% =========================================================
+
+\vspace{2.8cm}
+
+\begin{center}
+
+\begin{minipage}{16.9cm}
+
+{\color{autonegro}\rule{\linewidth}{0.55pt}}
+
+\vspace{0.27cm}
+
+\begin{flushright}
+
+{\fontsize{12.5}{15}\selectfont
+Neto:
+\hspace{1.75cm}
+\$121.500
+}
+
+\vspace{0.10cm}
+
+{\fontsize{12.5}{15}\selectfont
+IVA (19\%):
+\hspace{1.02cm}
+\$24.985
+}
+
+\vspace{0.13cm}
+
+{\fontsize{17}{20}\selectfont
+\bfseries\color{autorojo}
+Total:
+\hspace{1.43cm}
+\$146.485
+}
+
+\end{flushright}
+
+\end{minipage}
+
+\end{center}
+
+% =========================================================
+% FORMA DE PAGO
+% =========================================================
+
+\vspace{0.20cm}
+
+\begin{center}
+
+\begin{minipage}{16.9cm}
+
+{\fontsize{11.5}{14}\selectfont
+\bfseries Forma de pago:
+\hspace{0.15cm}
+\normalfont\FormaPago
+}
+
+\vspace{0.10cm}
+
+{\fontsize{11.5}{14}\selectfont
+\bfseries Nota:
+\hspace{0.15cm}
+\normalfont\NotaCotizacion
+}
+
+\end{minipage}
+
+\end{center}
+
+% =========================================================
+% DATOS DEL TALLER (ALINEADO A LA IZQUIERDA PARA EVITAR LA FRANJA NEGRA)
+% =========================================================
+
+\vfill
+
+\begin{center}
+
+\begin{minipage}{16.9cm}
+\raggedright
+\hspace*{0.5cm} % Margen de seguridad desde la izquierda
+
+\begin{minipage}{12.0cm} % Ancho acotado para despejar el lado derecho
+{\fontsize{14}{16}\selectfont
+\bfseries\color{autonegro}
+Fernando Pastrian
+}
+
+\vspace{0.20cm}
+
+{\fontsize{10.8}{14}\selectfont
+\textbf{Empresa:} \NombreEmpresa \hspace{0.4cm}
+\textbf{Dirección:} \DireccionEmpresa \\[0.12cm]
+\textbf{Mail:} \MailEmpresa \hspace{0.4cm}
+\textbf{Teléfono:} \TelefonoEmpresa
+}
+\end{minipage}
+
+\end{minipage}
+
+\end{center}
+
+\vspace{2.8cm}
+
+\end{document}

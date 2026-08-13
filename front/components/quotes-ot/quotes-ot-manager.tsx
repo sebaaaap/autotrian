@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { usePdfShare } from "@/hooks/usePdfShare";
 import { DocumentTemplate } from "./DocumentTemplate";
+import { AutotrianQuoteTemplate } from "./AutotrianQuoteTemplate";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { apiService } from "@/services/apiService";
@@ -93,9 +94,12 @@ export function QuotesOtManager({ type }: { type: "quote" | "ot" }) {
     // Modal State
     const [selectedDoc, setSelectedDoc] = useState<QuoteOtItem | null>(null);
     const [showPrintPreview, setShowPrintPreview] = useState(false);
+    const [quoteTemplate, setQuoteTemplate] = useState<"classic" | "autotrian">("autotrian");
+    const [notaCotizacion, setNotaCotizacion] = useState("Valores sujetos a revisión del vehículo.");
 
     const handlePrint = () => {
-        const printContent = document.getElementById("document-to-print");
+        const printId = quoteTemplate === "autotrian" ? "autotrian-document-to-print" : "document-to-print";
+        const printContent = document.getElementById(printId);
         const windowUrl = 'about:blank';
         const uniqueName = new Date().getTime();
         const windowName = 'Print' + uniqueName;
@@ -105,16 +109,17 @@ export function QuotesOtManager({ type }: { type: "quote" | "ot" }) {
             printWindow.document.write(`
                 <html>
                     <head>
-                        <title>Imprimir VANKAI</title>
+                        <title>Cotización Autotrian</title>
                         <script src="https://cdn.tailwindcss.com"></script>
                         <style>
                             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
-                            body { font-family: 'Inter', sans-serif; -webkit-print-color-adjust: exact; }
-                            @page { margin: 1cm; size: auto; }
+                            body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin: 0; padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                            @page { margin: 0; size: A4; }
+                            svg { display: block; }
                         </style>
                     </head>
                     <body>
-                        ${printContent.innerHTML}
+                        ${printContent.outerHTML}
                         <script>
                             setTimeout(() => {
                                 window.print();
@@ -925,7 +930,30 @@ export function QuotesOtManager({ type }: { type: "quote" | "ot" }) {
                             <h2 className="text-xl font-black tracking-tight flex items-center gap-2">
                                 <Printer size={24} className="text-primary" /> VISTA PREVIA DEL DOCUMENTO
                             </h2>
-                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">VANKAI KRYPTONITA VULCANIZACIÓN</p>
+                            {/* Selector de plantilla */}
+                            <div className="flex items-center gap-2 mt-2">
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Plantilla:</span>
+                                <button
+                                    onClick={() => setQuoteTemplate("autotrian")}
+                                    className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border ${
+                                        quoteTemplate === "autotrian"
+                                            ? "bg-[#eb1914] text-white border-[#eb1914] shadow-md"
+                                            : "bg-muted text-muted-foreground border-border hover:border-primary"
+                                    }`}
+                                >
+                                    🏎️ Autotrian
+                                </button>
+                                <button
+                                    onClick={() => setQuoteTemplate("classic")}
+                                    className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all border ${
+                                        quoteTemplate === "classic"
+                                            ? "bg-primary text-primary-foreground border-primary shadow-md"
+                                            : "bg-muted text-muted-foreground border-border hover:border-primary"
+                                    }`}
+                                >
+                                    📄 Clásica
+                                </button>
+                            </div>
                         </div>
                         <div className="flex gap-4">
                             <Button
@@ -944,10 +972,28 @@ export function QuotesOtManager({ type }: { type: "quote" | "ot" }) {
                         </div>
                     </div>
 
+                    <div className="p-4 border-b border-border/40 bg-background/60">
+                        {/* Campo de nota editable — solo para plantilla Autotrian */}
+                        {quoteTemplate === "autotrian" && (
+                            <div className="flex items-start gap-3">
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest pt-2 whitespace-nowrap">Nota:</label>
+                                <textarea
+                                    value={notaCotizacion}
+                                    onChange={(e) => setNotaCotizacion(e.target.value)}
+                                    placeholder="Escribe una nota para el cliente (opcional)..."
+                                    rows={2}
+                                    className="w-full text-xs bg-muted/50 border border-border rounded-lg px-3 py-2 text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/50 transition-all"
+                                />
+                            </div>
+                        )}
+                    </div>
+
                     <div className="p-12 pb-24 flex justify-center min-h-screen">
                         <div className="bg-white shadow-[0_35px_60px_-15px_rgba(0,0,0,0.3)] w-full max-w-[800px] transform hover:scale-[1.01] transition-transform duration-500">
                             {selectedDoc && (
-                                <DocumentTemplate data={selectedDoc} type={selectedDoc.type} />
+                                quoteTemplate === "autotrian"
+                                    ? <AutotrianQuoteTemplate data={selectedDoc} type={selectedDoc.type} notaCotizacion={notaCotizacion} />
+                                    : <DocumentTemplate data={selectedDoc} type={selectedDoc.type} />
                             )}
                         </div>
                     </div>
@@ -956,9 +1002,11 @@ export function QuotesOtManager({ type }: { type: "quote" | "ot" }) {
 
             {/* Hidden Container for PDF Generation */}
             <div style={{ position: "absolute", top: "-9999px", left: "-9999px", pointerEvents: "none", zIndex: -50 }}>
-                <div id="hidden-pdf-container" className="bg-white p-12 text-black" style={{ width: "800px", minHeight: "1131px", fontFamily: "Arial, sans-serif" }}>
+                <div id="hidden-pdf-container" className="bg-white text-black" style={{ width: "794px", minHeight: "1131px", fontFamily: "Arial, sans-serif" }}>
                     {selectedDoc && (
-                        <DocumentTemplate data={selectedDoc} type={selectedDoc.type} />
+                        quoteTemplate === "autotrian"
+                            ? <AutotrianQuoteTemplate data={selectedDoc} type={selectedDoc.type} notaCotizacion={notaCotizacion} />
+                            : <DocumentTemplate data={selectedDoc} type={selectedDoc.type} />
                     )}
                 </div>
             </div>
