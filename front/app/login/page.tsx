@@ -39,9 +39,10 @@ export default function LoginPage() {
                 muted
                 loop
                 playsInline
-                className="fixed bottom-0 right-0 w-[180px] sm:w-[220px] md:w-[280px] h-auto object-contain pointer-events-none z-0 opacity-90"
-                style={{ transform: 'translateX(15%) translateY(8%)' }}
+                className="fixed bottom-0 right-0 w-[220px] sm:w-[280px] md:w-[340px] h-auto object-contain pointer-events-none z-0 opacity-95"
+                style={{ transform: 'translateX(5%) translateY(5%)' }}
             >
+                <source src="/dino_transparent.webm" type="video/webm" />
                 <source src="/dino.webm" type="video/webm" />
             </video>
 
