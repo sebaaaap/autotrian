@@ -152,14 +152,15 @@ export default function LoginPage() {
                         </div>
                     </div>
 
-                    {/* Dino Mascota apoyado en la Card en pantallas medianas/grandes */}
+                    {/* Dino Mascota apoyado en el lateral de la Card */}
                     <video
                         autoPlay
                         muted
                         loop
                         playsInline
-                        className="hidden lg:block absolute -top-[45px] -right-[230px] w-[310px] h-auto object-contain pointer-events-none z-20"
+                        className="hidden lg:block absolute -top-[40px] -right-[270px] w-[320px] h-auto object-contain pointer-events-none z-0 opacity-95"
                     >
+                        <source src="/dinoparao_clean.webm" type="video/webm" />
                         <source src="/dinoparao_transparent.webm" type="video/webm" />
                         <source src="/dinoparao.mp4" type="video/mp4" />
                     </video>
