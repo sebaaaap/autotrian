@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Plus, ShoppingCart, X, FileSpreadsheet, CheckCircle2, XCircle, FileEdit, AlertTriangle } from "lucide-react";
+import { Plus, ShoppingCart, X, FileSpreadsheet, CheckCircle2, XCircle, FileEdit, AlertTriangle, Scan } from "lucide-react";
 import api from "@/lib/api";
 import { SIIImportModal } from "@/components/compras/sii-import-modal";
+import { InvoiceScannerModal } from "@/components/compras/invoice-scanner-modal";
 
 interface Supplier {
     id: string;
@@ -51,6 +52,7 @@ export function PurchasesList() {
     const [products, setProducts] = useState<Product[]>([]);
     const [isCreating, setIsCreating] = useState(false);
     const [showSIIImport, setShowSIIImport] = useState(false);
+    const [showScannerModal, setShowScannerModal] = useState(false);
     const [selectedPurchase, setSelectedPurchase] = useState<Purchase | null>(null);
     const [filterState, setFilterState] = useState<string>("");
     const [isProcessing, setIsProcessing] = useState(false);
@@ -227,6 +229,13 @@ export function PurchasesList() {
                 </div>
                 <div className="flex items-center gap-3">
                     <button
+                        onClick={() => setShowScannerModal(true)}
+                        className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors shadow-sm"
+                    >
+                        <Scan size={16} />
+                        <span>Escanear Factura con Pistola</span>
+                    </button>
+                    <button
                         onClick={() => setShowSIIImport(true)}
                         className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl border border-border bg-card text-foreground hover:bg-muted transition-colors"
                     >
@@ -320,6 +329,17 @@ export function PurchasesList() {
                     </div>
                 )}
             </div>
+
+            {/* ===== Single-Scan Invoice Intake Modal (Pistola Lectora) ===== */}
+            {showScannerModal && (
+                <InvoiceScannerModal
+                    onClose={() => setShowScannerModal(false)}
+                    onImported={() => {
+                        fetchPurchases();
+                        fetchProducts();
+                    }}
+                />
+            )}
 
             {/* ===== SII Import Modal ===== */}
             {showSIIImport && (

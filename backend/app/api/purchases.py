@@ -379,6 +379,302 @@ def update_purchase(
                 unit_cost=item.unit_cost,
                 subtotal=item.quantity * item.unit_cost
             )
+    return PurchaseResponse(
+        id=purchase.id,
+        date_created=purchase.date_created,
+        supplier_id=purchase.supplier_id,
+        invoice_number=purchase.invoice_number,
+        subtotal_net=purchase.subtotal_net,
+        tax_amount=purchase.tax_amount,
+        total_cost=purchase.total_cost,
+        state=purchase.state.name,
+        notes=purchase.notes,
+        items=[
+            PurchaseItemResponse(
+                id=item.id,
+                product_id=item.product_id,
+                quantity=item.quantity,
+                unit_cost=item.unit_cost,
+                subtotal=item.quantity * item.unit_cost
+            )
             for item in purchase.items
+        ]
+    )
+
+
+# ── SINGLE-SCAN INVOICE INTAKE (PISTOLA LECTORA) ──────────────────────────────
+
+from pydantic import BaseModel, Field
+
+class FastScanItem(BaseModel):
+    product_id: Optional[UUID] = None
+    product_name: str
+    quantity: float = 1.0
+    unit_cost: float = 0.0
+    barcode: Optional[str] = None
+
+class FastScanConfirmRequest(BaseModel):
+    supplier_id: Optional[UUID] = None
+    supplier_rut: Optional[str] = None
+    supplier_name: Optional[str] = None
+    invoice_number: str
+    items: List[FastScanItem]
+    notes: Optional[str] = None
+
+class ParseScanRequest(BaseModel):
+    scan_payload: str
+
+
+@router.post("/parse-scanned-invoice")
+def parse_scanned_invoice(
+    data: ParseScanRequest,
+    db: TenantSession = Depends(get_tenant_session),
+    current_user = Depends(check_roles(["admin", "inventario"])),
+    branch_id: Optional[UUID] = Header(None, alias="X-Branch-ID")
+):
+    """
+    Parsea la ráfaga de la pistola lectora sobre el timbre/código de la factura impresa (TED / DTE / QR).
+    Extrae RUT Emisor, Folio, Razón Social, Monto e Ítems.
+    Garantiza company_id y branch_id multitenant.
+    """
+    import re
+    from app.models.base import Supplier, Product
+
+    raw = data.scan_payload.strip()
+
+    supplier_rut = None
+    supplier_name = None
+    folio = None
+    total_amount = None
+    date_str = None
+    items_raw = []
+
+    # 1. Parsear TED (Timbre Electrónico DTE Chile en XML)
+    rut_match = re.search(r"<RE>(.*?)</RE>", raw, re.IGNORECASE)
+    if rut_match:
+        supplier_rut = rut_match.group(1).strip()
+
+    rso_match = re.search(r"<RSO>(.*?)</RSO>", raw, re.IGNORECASE)
+    if rso_match:
+        supplier_name = rso_match.group(1).strip()
+
+    folio_match = re.search(r"<F>(.*?)</F>", raw, re.IGNORECASE)
+    if folio_match:
+        folio = folio_match.group(1).strip()
+
+    date_match = re.search(r"<FE>(.*?)</FE>", raw, re.IGNORECASE)
+    if date_match:
+        date_str = date_match.group(1).strip()
+
+    mnt_match = re.search(r"<MNT>(.*?)</MNT>", raw, re.IGNORECASE)
+    if mnt_match:
+        try:
+            total_amount = float(mnt_match.group(1).strip())
+        except ValueError:
+            pass
+
+    # Extraer ítems IT1, IT2, NmbItem del XML
+    items_matches = re.findall(r"<(?:IT\d+|NmbItem)>(.*?)</(?:IT\d+|NmbItem)>", raw, re.IGNORECASE)
+    for it in items_matches:
+        if it.strip():
+            items_raw.append(it.strip())
+
+    # 2. Fallbacks de expresiones regulares si no es un XML TED completo
+    if not supplier_rut:
+        rut_fallback = re.search(r"\b(\d{1,8}-[\dkK])\b", raw)
+        if rut_fallback:
+            supplier_rut = rut_fallback.group(1)
+
+    if not folio:
+        folio_fallback = re.search(r"(?:folio|factura|nro|num)[:\s]*(\d+)", raw, re.IGNORECASE)
+        if folio_fallback:
+            folio = folio_fallback.group(1)
+
+    if not total_amount:
+        total_fallback = re.search(r"(?:total|monto)[:\s]*(\d+(?:\.\d+)?)", raw, re.IGNORECASE)
+        if total_fallback:
+            try:
+                total_amount = float(total_fallback.group(1))
+            except ValueError:
+                pass
+
+    if not folio:
+        folio = f"SCAN-{int(datetime.utcnow().timestamp())}"
+
+    # 3. Vincular o Auto-crear Proveedor respetando tenant company_id
+    supplier_obj = None
+    if supplier_rut:
+        supplier_obj = db.tenant_query(Supplier).filter(Supplier.tax_id == supplier_rut).first()
+        if not supplier_obj:
+            supplier_obj = Supplier(
+                name=supplier_name or f"Proveedor {supplier_rut}",
+                tax_id=supplier_rut,
+                company_id=db.company_id
+            )
+            db.add(supplier_obj)
+            db.commit()
+            db.refresh(supplier_obj)
+
+    # 4. Mapear ítems con catálogo de productos por código o nombre
+    mapped_items = []
+    all_products = db.tenant_query(Product).filter(Product.is_active == True).all()
+    prod_map_by_barcode = {p.barcode: p for p in all_products if p.barcode}
+    prod_map_by_name = {p.name.upper(): p for p in all_products if p.name}
+
+    if items_raw:
+        for raw_item in items_raw:
+            matched = prod_map_by_name.get(raw_item.upper()) or prod_map_by_barcode.get(raw_item)
+            mapped_items.append({
+                "product_id": str(matched.id) if matched else None,
+                "product_name": matched.name if matched else raw_item,
+                "quantity": 1.0,
+                "unit_cost": float(matched.cost) if matched else 0.0,
+                "barcode": matched.barcode if matched else None,
+                "is_matched": matched is not None
+            })
+    else:
+        # Si la factura escaneada no lista nombres de ítems individuales, retornar plantilla inicial
+        mapped_items.append({
+            "product_id": None,
+            "product_name": "Mercancía Factura " + str(folio),
+            "quantity": 1.0,
+            "unit_cost": total_amount or 0.0,
+            "barcode": None,
+            "is_matched": False
+        })
+
+    return {
+        "supplier_id": str(supplier_obj.id) if supplier_obj else None,
+        "supplier_rut": supplier_rut or (supplier_obj.tax_id if supplier_obj else ""),
+        "supplier_name": supplier_obj.name if supplier_obj else (supplier_name or "Proveedor Desconocido"),
+        "invoice_number": folio,
+        "date_created": date_str or datetime.utcnow().strftime("%Y-%m-%d"),
+        "total_amount": total_amount or 0.0,
+        "items": mapped_items
+    }
+
+
+@router.post("/fast-confirm-scanned", response_model=PurchaseResponse)
+def fast_confirm_scanned_purchase(
+    data: FastScanConfirmRequest,
+    db: TenantSession = Depends(get_tenant_session),
+    current_user = Depends(check_roles(["admin", "inventario"])),
+    branch_id: Optional[UUID] = Header(None, alias="X-Branch-ID")
+):
+    """
+    Confirma de un solo golpe la compra escaneada e incrementa el stock de inventario.
+    Garantiza estricto aislamiento por company_id y branch_id.
+    """
+    from app.models.base import Supplier, Product, StorageLocation, Purchase, PurchaseItem, PurchaseState
+
+    if not data.items or len(data.items) == 0:
+        raise HTTPException(status_code=400, detail="La compra debe incluir al menos un ítem")
+
+    # 1. Obtener o crear proveedor asignando company_id
+    supplier_id = data.supplier_id
+    if not supplier_id and data.supplier_rut:
+        existing_sup = db.tenant_query(Supplier).filter(Supplier.tax_id == data.supplier_rut).first()
+        if existing_sup:
+            supplier_id = existing_sup.id
+        else:
+            new_sup = Supplier(
+                name=data.supplier_name or f"Proveedor {data.supplier_rut}",
+                tax_id=data.supplier_rut,
+                company_id=db.company_id
+            )
+            db.add(new_sup)
+            db.flush()
+            supplier_id = new_sup.id
+
+    # 2. Ubicación por defecto de la sucursal
+    default_loc = db.tenant_query(StorageLocation).filter(StorageLocation.name != "Pasillo Mermas")
+    if branch_id:
+        default_loc = default_loc.filter(StorageLocation.branch_id == branch_id)
+    first_loc = default_loc.first()
+    loc_id = first_loc.id if first_loc else None
+
+    # 3. Procesar o auto-crear productos
+    purchase_items_payload = []
+    for item in data.items:
+        prod_id = item.product_id
+        if not prod_id:
+            # Buscar si ya existe por nombre o código de barras
+            q = db.tenant_query(Product).filter(Product.is_active == True)
+            if item.barcode:
+                existing_p = q.filter(Product.barcode == item.barcode).first()
+            else:
+                existing_p = q.filter(Product.name == item.product_name).first()
+
+            if existing_p:
+                prod_id = existing_p.id
+            else:
+                # Crear producto con company_id y branch_id explícitos
+                new_prod = Product(
+                    name=item.product_name,
+                    barcode=item.barcode or f"BC-{int(datetime.utcnow().timestamp() * 1000)}",
+                    cost=Decimal(str(item.unit_cost or 0)),
+                    price=Decimal(str((item.unit_cost or 0) * 1.3)),
+                    stock_quantity=0,
+                    location_id=loc_id,
+                    company_id=db.company_id,
+                    branch_id=branch_id,
+                    is_active=True
+                )
+                db.add(new_prod)
+                db.flush()
+                prod_id = new_prod.id
+
+        purchase_items_payload.append({
+            "product_id": prod_id,
+            "quantity": item.quantity,
+            "unit_cost": item.unit_cost
+        })
+
+    # 4. Crear Compra con la estructura requerida por PurchaseService
+    from app.schemas.purchases import PurchaseCreate, PurchaseItemCreate
+    purchase_create_data = PurchaseCreate(
+        supplier_id=supplier_id,
+        invoice_number=data.invoice_number,
+        purchase_category="MERCADERÍA",
+        notes=data.notes or "Ingreso por Pinchazo Único de Factura (Pistola Lectora)",
+        items=[
+            PurchaseItemCreate(
+                product_id=it["product_id"],
+                quantity=it["quantity"],
+                unit_cost=it["unit_cost"]
+            )
+            for it in purchase_items_payload
+        ]
+    )
+
+    service = PurchaseService(db)
+    purchase = service.create_purchase(purchase_create_data)
+
+    if branch_id:
+        purchase.branch_id = branch_id
+        db.commit()
+
+    # 5. Confirmar inmediatamente la compra para incrementar el stock en inventario
+    confirmed_purchase = service.confirm_purchase(purchase.id)
+
+    return PurchaseResponse(
+        id=confirmed_purchase.id,
+        date_created=confirmed_purchase.date_created,
+        supplier_id=confirmed_purchase.supplier_id,
+        invoice_number=confirmed_purchase.invoice_number,
+        subtotal_net=confirmed_purchase.subtotal_net,
+        tax_amount=confirmed_purchase.tax_amount,
+        total_cost=confirmed_purchase.total_cost,
+        state=confirmed_purchase.state.name,
+        notes=confirmed_purchase.notes,
+        items=[
+            PurchaseItemResponse(
+                id=item.id,
+                product_id=item.product_id,
+                quantity=item.quantity,
+                unit_cost=item.unit_cost,
+                subtotal=item.quantity * item.unit_cost
+            )
+            for item in confirmed_purchase.items
         ]
     )
