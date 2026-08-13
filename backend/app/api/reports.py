@@ -1,18 +1,18 @@
 from decimal import Decimal
 from uuid import UUID
-from fastapi import APIRouter, Depends, Query, Header
+from fastapi import APIRouter, Depends, Query, Header, HTTPException
 
 from sqlalchemy import func, case, desc, extract
 from typing import List, Optional
 from datetime import datetime, timedelta
-from app.api.deps import get_tenant_session
+from app.api.deps import get_tenant_session, get_current_user, check_roles
 from app.db.tenant_session import TenantSession
 from app.models.base import (
     Product, ProductCategory, StorageLocation, Branch,
     Ticket, SaleItem, SaleState, Payment, PaymentMethod,
     Purchase, PurchaseItem, Supplier, PurchaseState,
     CashSession, InventoryMovement, MovementType, ProductType,
-    Expense, ExpenseCategory, User, CashRegister
+    Expense, ExpenseCategory, User, UserRole, CashRegister
 )
 
 router = APIRouter()
@@ -1472,4 +1472,63 @@ def export_expenses_report_excel(
         buffer,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# EMAIL REPORTS — Envío de reportes por correo con Resend
+# ═══════════════════════════════════════════════════════════════════════════
+
+from pydantic import BaseModel as PydBaseModel
+
+class EmailReportRequest(PydBaseModel):
+    period: str = "daily"  # daily | weekly | monthly
+    emails: Optional[List[str]] = None  # Si None, se envía a todos los admins de la empresa
+
+@router.post("/email/send")
+def send_email_report(
+    data: EmailReportRequest,
+    db: TenantSession = Depends(get_tenant_session),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Envía un reporte por correo electrónico.
+    - period: daily, weekly, monthly
+    - emails: lista de correos (opcional). Si se omite, se envía a todos los admin de la empresa.
+    """
+    from app.services.email_service import send_report_email
+    from app.models.base import Company
+
+    company_id = current_user.company_id
+    if not company_id:
+        raise HTTPException(status_code=400, detail="Usuario sin empresa asignada")
+
+    company = db.query(Company).filter(Company.id == company_id).first()
+    company_name = company.name if company else "Mi Empresa"
+
+    # Determinar destinatarios
+    if data.emails:
+        recipients = data.emails
+    else:
+        # Buscar todos los usuarios admin/superadmin con email de la empresa
+        admins = db.query(User).filter(
+            User.company_id == company_id,
+            User.is_active == True,
+            User.role.in_([UserRole.admin, UserRole.superadmin]),
+            User.email.isnot(None)
+        ).all()
+        recipients = [a.email for a in admins if a.email]
+
+    if not recipients:
+        raise HTTPException(
+            status_code=400,
+            detail="No hay destinatarios. Especifica emails o asegúrate de que los admins tengan email configurado."
+        )
+
+    return send_report_email(
+        db=db._db,
+        company_id=company_id,
+        company_name=company_name,
+        period=data.period,
+        recipient_emails=recipients
     )
