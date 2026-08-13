@@ -102,15 +102,26 @@ def get_products_in_location(
     branch_id: Optional[UUID] = Header(None, alias="X-Branch-ID")
 ):
     """
-    Devuelve los productos asignados a una ubicación específica
+    Devuelve los productos asignados a una ubicación específica o sus sub-ubicaciones
     """
-    # Filter by location and active status
+    target_loc = db.tenant_query(StorageLocation).filter(StorageLocation.id == location_id).first()
+    if not target_loc:
+        return []
+
+    loc_ids = [target_loc.id]
+    if target_loc.path:
+        sub_locs = db.tenant_query(StorageLocation.id).filter(
+            StorageLocation.path.like(f"{target_loc.path}/%")
+        ).all()
+        loc_ids.extend([s[0] for s in sub_locs])
+
     query = db.tenant_query(Product).filter(
-        Product.location_id == location_id,
-        Product.is_active == True
+        Product.location_id.in_(loc_ids),
+        Product.is_active == True,
+        Product.stock_quantity > 0
     )
     if branch_id:
-        query = query.filter(Product.branch_id == branch_id)
+        query = query.filter((Product.branch_id == branch_id) | (Product.branch_id.is_(None)))
         
     products = query.all()
     

@@ -79,7 +79,9 @@ class InventoryService:
         target_product = self.db.tenant_query(Product).filter(
             Product.barcode == product.barcode,
             Product.location_id == to_location_id,
-            Product.is_active == True
+            Product.is_active == True,
+            Product.is_scrap == product.is_scrap,
+            Product.scrap_parent_id == product.scrap_parent_id
         ).first()
 
         # VALIDACIÓN DE RESTRICCIÓN DE UBICACIÓN (SI ES ESTRICTA)
@@ -101,6 +103,9 @@ class InventoryService:
                     detail=f"La ubicación '{target_loc.name}' es de producto único y está ocupada por '{other_occupant.name}'. No se permiten múltiples productos aquí."
                 )
 
+        target_company_id = product.company_id or (target_loc.company_id if target_loc else getattr(self.db, "company_id", None))
+        target_branch_id = product.branch_id or (target_loc.branch_id if target_loc else None)
+
         # Caso traslado total (o mayor al stock disponible)
         if quantity >= product.stock_quantity:
             qty_to_move = product.stock_quantity # Movemos todo lo que hay
@@ -108,6 +113,10 @@ class InventoryService:
             if target_product:
                 # Si existe en destino: Sumar al destino y DESACTIVAR el origen (Fusión lógica)
                 target_product.stock_quantity += qty_to_move
+                if not target_product.company_id and target_company_id:
+                    target_product.company_id = target_company_id
+                if not target_product.branch_id and target_branch_id:
+                    target_product.branch_id = target_branch_id
                 
                 # En lugar de borrar físicamente, desactivamos para no romper el historial de movimientos
                 product.stock_quantity = 0
@@ -117,6 +126,10 @@ class InventoryService:
             else:
                 # Si NO existe en destino: Mover el registro completo (cambiar location_id)
                 product.location_id = to_location_id
+                if not product.company_id and target_company_id:
+                    product.company_id = target_company_id
+                if not product.branch_id and target_branch_id:
+                    product.branch_id = target_branch_id
                 return (product, product)
         
         else:
@@ -127,6 +140,10 @@ class InventoryService:
             if target_product:
                  # 2. Si existe, sumar
                 target_product.stock_quantity += quantity
+                if not target_product.company_id and target_company_id:
+                    target_product.company_id = target_company_id
+                if not target_product.branch_id and target_branch_id:
+                    target_product.branch_id = target_branch_id
                 return (product, target_product) 
             else:
                 # 3. Si no existe, crear clon
@@ -139,11 +156,16 @@ class InventoryService:
                     uom=product.uom,
                     product_type=product.product_type,
                     category_id=product.category_id,
+                    category=product.category,
                     image_path=product.image_path,
                     min_stock=product.min_stock,
                     is_active=product.is_active,
                     location_id=to_location_id,
-                    branch_id=product.branch_id,
+                    branch_id=target_branch_id,
+                    company_id=target_company_id,
+                    is_variable_consumption=product.is_variable_consumption,
+                    default_consumption_rate=product.default_consumption_rate,
+                    is_raw_material=product.is_raw_material,
                     is_scrap=product.is_scrap,
                     scrap_parent_id=product.scrap_parent_id,
                     stock_quantity=quantity

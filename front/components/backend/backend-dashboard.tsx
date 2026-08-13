@@ -24,27 +24,27 @@ const modulesConfig = [
   {
     id: "pdv" as ModuleId,
     name: "Punto de Venta",
-    description: "Caja registradora para ventas directas a clientes",
+    description: "Caja registradora para ventas directas a clientes y cobros veloces",
     icon: Monitor,
-    color: "bg-primary",
+    color: "bg-primary text-primary-foreground",
     badge: "Abierto",
     roles: ["admin", "vendedor"],
   },
   {
     id: "compras" as ModuleId,
     name: "Compras",
-    description: "Gestion de ordenes de compra y proveedores",
+    description: "Gestión de órdenes de compra, entrada de productos y proveedores",
     icon: ShoppingCart,
-    color: "bg-secondary",
+    color: "bg-secondary text-secondary-foreground",
     badge: "",
     roles: ["admin"],
   },
   {
     id: "inventario" as ModuleId,
     name: "Inventario",
-    description: "Control de stock, movimientos y almacenes",
+    description: "Control de stock, movimientos, ajustes y catálogo de repuestos",
     icon: Package,
-    color: "bg-amber-600",
+    color: "bg-amber-600 text-white",
     badge: "",
     roles: ["admin"],
   },
@@ -54,17 +54,17 @@ const workshopConfig = [
   {
     id: "taller" as ModuleId,
     name: "Taller Automotriz",
-    description: "Gestión de cotizaciones para servicios y repuestos",
+    description: "Gestión de cotizaciones, órdenes de trabajo, repuestos e historial vehicular",
     icon: Wrench,
-    color: "bg-blue-600",
+    color: "bg-[#eb1914] text-white",
     roles: ["admin"],
   }
 ]
 
 const quickLinksConfig = [
-  { label: "Clientes", icon: Users, description: "Gestionar clientes y vehiculos", roles: ["admin"] },
-  { label: "Reportes", icon: BarChart3, description: "Ventas, compras e inventario", roles: ["admin"] },
-  { label: "Configuracion", icon: Settings, description: "Ajustes generales del sistema", roles: ["admin"] },
+  { label: "Clientes", icon: Users, description: "Gestionar clientes y vehículos asociados", roles: ["admin"] },
+  { label: "Reportes", icon: BarChart3, description: "Estadísticas de ventas, compras e inventario", roles: ["admin"] },
+  { label: "Configuracion", icon: Settings, description: "Ajustes generales e información del negocio", roles: ["admin"] },
 ]
 
 export function BackendDashboard({ onNavigate }: BackendDashboardProps) {
@@ -78,64 +78,68 @@ export function BackendDashboard({ onNavigate }: BackendDashboardProps) {
 
   return (
     <div className="flex h-screen flex-col bg-background">
-      {/* Top Bar */}
-      <header className="flex items-center justify-between border-b border-border bg-card px-6 py-3">
-        <div className="flex items-center gap-3">
+      {/* Top Bar Ampliado y Destacado */}
+      <header className="flex items-center justify-between border-b border-border bg-card px-8 py-4 shadow-sm shrink-0">
+        <div className="flex items-center gap-4">
           {settings.logoBase64 ? (
             <img 
               src={settings.logoBase64} 
-              alt="Logo" 
-              className="h-9 w-9 object-contain rounded-lg"
+              alt="Logo Taller" 
+              className="h-12 w-auto max-w-[180px] object-contain drop-shadow-sm"
             />
           ) : (
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-              <Wrench className="h-5 w-5 text-primary-foreground" />
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#eb1914] shadow-md shadow-[#eb1914]/20">
+              <Wrench className="h-6 w-6 text-white" />
             </div>
           )}
-          <div>
-            <h1 className="text-sm font-bold text-foreground leading-none">VKI</h1>
-            <p className="text-[11px] text-muted-foreground">Sistema de Gestion - Talleres Mecanicos</p>
+          <div className="border-l border-border/60 pl-4">
+            <h1 className="text-xl font-black text-foreground leading-tight tracking-tight">VKI</h1>
+            <p className="text-xs font-semibold text-muted-foreground">Sistema de Gestión — Talleres Mecánicos</p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground border-r pr-4">
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10">
-              <Users className="h-3.5 w-3.5 text-primary" />
+
+        <div className="flex items-center gap-5">
+          <div className="flex items-center gap-3 border-r border-border/60 pr-5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">
+              <Users className="h-4 w-4 text-primary" />
             </div>
             <div className="flex flex-col">
-              <span className="font-bold text-foreground leading-none">{user?.full_name || user?.username}</span>
-              <span className="text-[10px] uppercase tracking-wider">{user?.role === 'admin' ? 'Administrador' : 'Vendedor'}</span>
+              <span className="font-extrabold text-sm text-foreground leading-none">{user?.full_name || user?.username}</span>
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">
+                {user?.role === 'admin' ? 'Administrador' : 'Vendedor'}
+              </span>
             </div>
           </div>
           
-          <div className="border-r pr-4 mr-2">
+          <div className="border-r border-border/60 pr-5">
             <BranchSelector />
           </div>
 
           <button
-            onClick={() => confirm('¿Cerrar sesión?') && logout()}
-            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-destructive transition-colors px-2 py-1 rounded-md hover:bg-destructive/10"
+            onClick={() => confirm('¿Desea cerrar sesión?') && logout()}
+            className="flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-destructive transition-colors px-3 py-2 rounded-xl hover:bg-destructive/10 border border-transparent hover:border-destructive/20"
           >
-            <LogOut size={16} />
+            <LogOut size={18} />
             <span className="hidden sm:inline">Cerrar Sesión</span>
           </button>
         </div>
       </header>
 
-      {/* Main Content */}
-      <div className="flex-1 overflow-auto p-6">
-        <div className="mx-auto max-w-4xl">
-          {/* Welcome */}
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-foreground text-balance">Panel de Control</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+      {/* Main Content — Ampliado max-w-6xl */}
+      <div className="flex-1 overflow-auto p-8 md:p-10">
+        <div className="mx-auto max-w-6xl">
+          {/* Welcome Header */}
+          <div className="mb-10">
+            <h2 className="text-3xl font-black tracking-tight text-foreground text-balance">Panel de Control</h2>
+            <p className="mt-1.5 text-base font-medium text-muted-foreground">
               {isAdmin
-                ? "Selecciona un modulo para comenzar a trabajar"
+                ? "Selecciona un módulo para comenzar a trabajar"
                 : "Bienvenido, selecciona una de tus herramientas permitidas"}
             </p>
           </div>
 
-          <div className={`grid grid-cols-1 gap-4 ${filteredModules.length > 2 ? 'md:grid-cols-3' : 'md:grid-cols-2'} mb-8`}>
+          {/* Módulos Principales — Tarjetas más grandes */}
+          <div className={`grid grid-cols-1 gap-6 ${filteredModules.length > 2 ? 'md:grid-cols-3' : 'md:grid-cols-2'} mb-10`}>
             {filteredModules.map((mod) => {
               const Icon = mod.icon
               return (
@@ -143,36 +147,36 @@ export function BackendDashboard({ onNavigate }: BackendDashboardProps) {
                   key={mod.id}
                   type="button"
                   onClick={() => onNavigate(mod.id)}
-                  className="group flex flex-col rounded-2xl border border-border bg-card p-6 text-left transition-all hover:shadow-xl hover:shadow-primary/5 hover:border-primary/30 active:scale-[0.98]"
+                  className="group flex flex-col rounded-3xl border-2 border-border/70 bg-card p-7 text-left transition-all duration-300 hover:shadow-2xl hover:shadow-primary/10 hover:border-primary/40 hover:-translate-y-1 active:scale-[0.99] cursor-pointer"
                 >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${mod.color}`}>
-                      <Icon className="h-6 w-6 text-primary-foreground" />
+                  <div className="flex items-start justify-between mb-5">
+                    <div className={`flex h-14 w-14 items-center justify-center rounded-2xl shadow-md ${mod.color}`}>
+                      <Icon className="h-7 w-7" />
                     </div>
                     {mod.badge && (
-                      <span className="rounded-full bg-muted px-2.5 py-1 text-[10px] font-semibold text-muted-foreground">
-                        {mod.badge}
+                      <span className="rounded-full bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                        ● {mod.badge}
                       </span>
                     )}
                   </div>
-                  <h3 className="text-base font-bold text-foreground mb-1">{mod.name}</h3>
-                  <p className="text-xs text-muted-foreground leading-relaxed mb-4">
+                  <h3 className="text-xl font-black text-foreground mb-2 group-hover:text-primary transition-colors">{mod.name}</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed mb-6 font-medium">
                     {mod.description}
                   </p>
-                  <div className="mt-auto flex items-center gap-1.5 text-xs font-semibold text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span>Abrir modulo</span>
-                    <ChevronRight className="h-3.5 w-3.5" />
+                  <div className="mt-auto flex items-center gap-2 text-xs font-bold text-primary group-hover:translate-x-1 transition-transform">
+                    <span>Abrir módulo</span>
+                    <ChevronRight className="h-4 w-4" />
                   </div>
                 </button>
               )
             })}
           </div>
 
-          {/* Workshop Details Level */}
+          {/* Seccion Taller */}
           {filteredWorkshop.length > 0 && (
-            <div className="mb-8">
-              <h3 className="text-sm font-bold text-foreground mb-3">Taller y Servicios</h3>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="mb-10">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">Taller y Servicios</h3>
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 {filteredWorkshop.map((mod) => {
                   const Icon = mod.icon
                   return (
@@ -180,22 +184,22 @@ export function BackendDashboard({ onNavigate }: BackendDashboardProps) {
                       key={mod.id}
                       type="button"
                       onClick={() => onNavigate(mod.id)}
-                      className="group flex flex-col rounded-2xl border border-border bg-card p-4 text-left transition-all hover:shadow-md hover:border-primary/30 active:scale-[0.98]"
+                      className="group flex flex-col rounded-3xl border-2 border-border/70 bg-card p-6 text-left transition-all duration-300 hover:shadow-xl hover:shadow-[#eb1914]/10 hover:border-[#eb1914]/40 hover:-translate-y-0.5 active:scale-[0.99] cursor-pointer"
                     >
-                      <div className="flex items-center gap-4 mb-3">
-                        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${mod.color}`}>
-                          <Icon className="h-5 w-5 text-primary-foreground" />
+                      <div className="flex items-center gap-5 mb-4">
+                        <div className={`flex h-14 w-14 items-center justify-center rounded-2xl shadow-md ${mod.color}`}>
+                          <Icon className="h-7 w-7" />
                         </div>
                         <div>
-                          <h3 className="text-sm font-bold text-foreground leading-tight">{mod.name}</h3>
-                          <p className="text-[11px] text-muted-foreground mt-0.5">
+                          <h3 className="text-lg font-black text-foreground group-hover:text-[#eb1914] transition-colors">{mod.name}</h3>
+                          <p className="text-xs font-medium text-muted-foreground mt-1 leading-relaxed">
                             {mod.description}
                           </p>
                         </div>
                       </div>
-                      <div className="mt-auto flex items-center gap-1.5 text-[11px] font-semibold text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                        <span>Gestionar Órdenes</span>
-                        <ChevronRight className="h-3 w-3" />
+                      <div className="mt-auto flex items-center gap-2 text-xs font-bold text-[#eb1914] group-hover:translate-x-1 transition-transform pt-2">
+                        <span>Gestionar Órdenes y Cotizaciones</span>
+                        <ChevronRight className="h-4 w-4" />
                       </div>
                     </button>
                   )
@@ -204,11 +208,11 @@ export function BackendDashboard({ onNavigate }: BackendDashboardProps) {
             </div>
           )}
 
-          {/* Quick Links */}
+          {/* Accesos Rápidos */}
           {filteredQuickLinks.length > 0 && (
-            <div>
-              <h3 className="text-sm font-bold text-foreground mb-3">Accesos Rapidos</h3>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="mb-10">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">Accesos Rápidos</h3>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 {filteredQuickLinks.map((link) => {
                   const Icon = link.icon
                   return (
@@ -223,14 +227,14 @@ export function BackendDashboard({ onNavigate }: BackendDashboardProps) {
                           onNavigate("clientes" as any)
                         }
                       }}
-                      className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left transition-all hover:bg-muted/50 cursor-pointer w-full"
+                      className="flex items-center gap-4 rounded-2xl border border-border bg-card p-5 text-left transition-all duration-200 hover:bg-muted/60 hover:border-primary/30 hover:shadow-md cursor-pointer w-full group"
                     >
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-                        <Icon className="h-4 w-4 text-muted-foreground" />
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-muted border border-border/50 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                        <Icon className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-foreground">{link.label}</p>
-                        <p className="text-[11px] text-muted-foreground">{link.description}</p>
+                        <p className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">{link.label}</p>
+                        <p className="text-xs text-muted-foreground font-medium mt-0.5">{link.description}</p>
                       </div>
                     </button>
                   )
@@ -241,10 +245,11 @@ export function BackendDashboard({ onNavigate }: BackendDashboardProps) {
         </div>
         
         {/* Footer */}
-        <div className="mt-12 mb-4 text-center text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-widest">
+        <div className="mt-16 mb-6 text-center text-xs font-bold text-muted-foreground/50 uppercase tracking-[0.25em]">
           Powered by VankaiLabs
         </div>
       </div>
     </div>
   )
 }
+

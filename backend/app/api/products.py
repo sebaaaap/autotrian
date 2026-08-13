@@ -358,6 +358,33 @@ class ProductAggregatedResponse(BaseModel):
     bom_lines: List[BOMLineRead] = []
     available_qty: float = 0.0 # Calculado al vuelo
 
+def heal_orphaned_products(db: TenantSession):
+    try:
+        orphans = db._db.query(Product).filter(
+            (Product.company_id == None) | (Product.branch_id == None)
+        ).all()
+        if not orphans:
+            return
+        
+        modified = False
+        for p in orphans:
+            if p.location:
+                if not p.company_id and p.location.company_id:
+                    p.company_id = p.location.company_id
+                    modified = True
+                if not p.branch_id and p.location.branch_id:
+                    p.branch_id = p.location.branch_id
+                    modified = True
+            
+            if not p.company_id and db.company_id:
+                p.company_id = db.company_id
+                modified = True
+                
+        if modified:
+            db._db.commit()
+    except Exception:
+        db._db.rollback()
+
 @router.get("/", response_model=List[ProductAggregatedResponse])
 def list_products(
     q: Optional[str] = None,
@@ -369,9 +396,11 @@ def list_products(
     Lista productos agrupados por código de barras con stock total y detalle de ubicaciones.
     Solo muestra productos del tenant (empresa) del usuario logueado.
     """
+    heal_orphaned_products(db)
+
     query = db.tenant_query(Product).filter(Product.is_active == True)
     if branch_id:
-        query = query.filter(Product.branch_id == branch_id)
+        query = query.filter((Product.branch_id == branch_id) | (Product.branch_id.is_(None)))
     
     if q:
         query = query.filter(
@@ -410,7 +439,7 @@ def list_products(
         
         locs = []
         for i in items:
-            if i.location:
+            if i.location and i.stock_quantity > 0:
                 locs.append(ProductLocationDetail(
                     id=i.id,
                     location_id=i.location.id,
