@@ -90,7 +90,7 @@ export function AutotrianQuoteTemplate({ data, type, notaCotizacion }: Autotrian
             id="autotrian-document-to-print"
             style={{
                 position:   "relative",
-                width:      "210mm",
+                width:      "100%",       // ocupa todo el contenedor del modal
                 minHeight:  "297mm",
                 background: "#fff",
                 fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
@@ -289,32 +289,28 @@ export function AutotrianQuoteTemplate({ data, type, notaCotizacion }: Autotrian
                 {/* ── SEPARADOR ── */}
                 <div style={{ borderTop: `0.5px solid ${NEGRO}`, marginBottom: "5mm" }} />
 
-                {/* ── TOTALES (alineados a la derecha) ── */}
-                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "5mm" }}>
-                    <div style={{ fontSize: "11.5pt", lineHeight: "1.9", minWidth: "90mm" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                            <span>Neto:</span>
-                            <span>{fmt(neto)}</span>
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                            <span>IVA (19%):</span>
-                            <span>{fmt(iva)}</span>
-                        </div>
-                        <div style={{
-                            display:        "flex",
-                            justifyContent: "space-between",
-                            fontSize:       "15pt",
-                            fontWeight:     "bold",
-                            color:          ROJO,
-                        }}>
-                            <span>Total:</span>
-                            <span>{fmt(total)}</span>
-                        </div>
-                    </div>
+                {/* ── TOTALES — compactos, alineados a la derecha igual al LaTeX ── */}
+                <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "4mm" }}>
+                    <table style={{ borderCollapse: "collapse", fontSize: "11.5pt", lineHeight: "1.85" }}>
+                        <tbody>
+                            <tr>
+                                <td style={{ textAlign: "right", paddingRight: "14mm", whiteSpace: "nowrap" }}>Neto:</td>
+                                <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{fmt(neto)}</td>
+                            </tr>
+                            <tr>
+                                <td style={{ textAlign: "right", paddingRight: "14mm", whiteSpace: "nowrap" }}>IVA (19%):</td>
+                                <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{fmt(iva)}</td>
+                            </tr>
+                            <tr style={{ fontSize: "15pt", fontWeight: "bold", color: ROJO }}>
+                                <td style={{ textAlign: "right", paddingRight: "14mm", whiteSpace: "nowrap" }}>Total:</td>
+                                <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>{fmt(total)}</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
 
                 {/* ── FORMA DE PAGO Y NOTA ── */}
-                <div style={{ fontSize: "10.5pt", lineHeight: "1.7", marginBottom: "7mm" }}>
+                <div style={{ fontSize: "10.5pt", lineHeight: "1.7", marginBottom: "5mm" }}>
                     <div>
                         <span style={{ fontWeight: "bold" }}>Forma de pago:</span>
                         &nbsp;&nbsp;{formaPago}
