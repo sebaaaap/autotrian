@@ -191,7 +191,7 @@ export function AutotrianQuoteTemplate({ data, type, notaCotizacion }: Autotrian
                     style={{
                         position:      "absolute",
                         left:          "14.2cm",
-                        top:           "25.5cm",
+                        top:           "24cm",
                         transform:     "translate(-50%, -50%)",
                         width:         "6.5cm",
                         opacity:       0.12,
@@ -283,8 +283,8 @@ export function AutotrianQuoteTemplate({ data, type, notaCotizacion }: Autotrian
                     </tbody>
                 </table>
 
-                {/* ── VFILL reducido — sube el bloque de totales/footer ── */}
-                <div style={{ height: "22mm" }} />
+                {/* ── VFILL — empuja totales/footer hacia abajo (como \vfill en LaTeX) ── */}
+                <div style={{ flex: 1, minHeight: "12mm" }} />
 
                 {/* ── SEPARADOR ── */}
                 <div style={{ borderTop: `0.5px solid ${NEGRO}`, marginBottom: "5mm" }} />
@@ -329,7 +329,7 @@ export function AutotrianQuoteTemplate({ data, type, notaCotizacion }: Autotrian
                     desde el borde inferior, por lo que el footer queda
                     completamente en zona blanca con marginBottom de 28 mm.
                 ── */}
-                <div style={{ marginBottom: "18mm", color: NEGRO }}>
+                <div style={{ marginBottom: "35mm", color: NEGRO }}>
                     <div style={{ fontSize: "13pt", fontWeight: "bold", marginBottom: "2mm" }}>
                         {ownerName}
                     </div>
