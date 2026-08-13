@@ -12,7 +12,7 @@ from app.models.base import (
     Ticket, SaleItem, SaleState, Payment, PaymentMethod,
     Purchase, PurchaseItem, Supplier, PurchaseState,
     CashSession, InventoryMovement, MovementType, ProductType,
-    Expense, ExpenseCategory
+    Expense, ExpenseCategory, User, CashRegister
 )
 
 router = APIRouter()
@@ -1177,6 +1177,297 @@ def export_purchases_excel(
     buffer.seek(0)
 
     filename = f"compras_{start_dt.strftime('%Y%m%d')}_{end_dt.strftime('%Y%m%d')}.xlsx"
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+
+# ── EXPENSES REPORTS ────────────────────────────────────────────────────────────
+
+@router.get("/expenses/summary")
+def get_expenses_report_summary(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    category_id: Optional[UUID] = Query(None),
+    payment_method: Optional[str] = Query(None),
+    branch_id: Optional[UUID] = Query(None, alias="branch_id"),
+    db: TenantSession = Depends(get_tenant_session)
+):
+    """
+    Genera métricas, gráficos e historial completo de gastos para el módulo de reportes.
+    """
+    start_dt = parse_date(start_date)
+    end_dt = parse_date(end_date)
+
+    if not start_dt:
+        start_dt = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=30)
+    if not end_dt:
+        end_dt = datetime.utcnow()
+
+    if start_dt > end_dt:
+        start_dt, end_dt = end_dt, start_dt
+
+    if len(end_date or "") <= 10:
+        end_dt = end_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+    query = db.tenant_query(Expense).join(Expense.session).filter(
+        Expense.date_created >= start_dt,
+        Expense.date_created <= end_dt
+    )
+
+    if category_id:
+        query = query.filter(Expense.category_id == category_id)
+
+    if payment_method and payment_method != "all":
+        query = query.filter(Expense.payment_method.ilike(f"%{payment_method}%"))
+
+    if branch_id and branch_id != "all":
+        query = query.join(CashSession.cash_register).filter(
+            (CashRegister.branch_id == branch_id) | (CashRegister.branch_id.is_(None))
+        )
+
+    expenses = query.order_by(desc(Expense.date_created)).all()
+
+    all_users = db.tenant_query(User).all()
+    users_map = {}
+    for u in all_users:
+        disp_name = u.full_name or u.username
+        users_map[u.username] = disp_name
+        users_map[str(u.id)] = disp_name
+
+    categories_map = {
+        c.id: {"name": c.name, "color": c.color or "#6366f1", "icon": c.icon or "receipt"}
+        for c in db.tenant_query(ExpenseCategory).all()
+    }
+
+    total_expenses = sum(Decimal(str(e.amount)) for e in expenses)
+    total_count = len(expenses)
+    avg_expense = total_expenses / total_count if total_count > 0 else Decimal('0.00')
+
+    cat_summary = {}
+    for e in expenses:
+        cat_info = categories_map.get(e.category_id, {"name": "General", "color": "#6366f1", "icon": "receipt"})
+        c_name = cat_info["name"]
+        if c_name not in cat_summary:
+            cat_summary[c_name] = {
+                "name": c_name,
+                "color": cat_info["color"],
+                "icon": cat_info["icon"],
+                "total": Decimal('0.00'),
+                "count": 0
+            }
+        cat_summary[c_name]["total"] += Decimal(str(e.amount))
+        cat_summary[c_name]["count"] += 1
+
+    top_category_name = "—"
+    if cat_summary:
+        top_cat = max(cat_summary.values(), key=lambda x: x["total"])
+        top_category_name = top_cat["name"]
+
+    category_chart_data = []
+    for c_name, data in sorted(cat_summary.items(), key=lambda item: item[1]["total"], reverse=True):
+        category_chart_data.append({
+            "name": c_name,
+            "total": float(data["total"]),
+            "count": data["count"],
+            "color": data["color"],
+            "icon": data["icon"],
+            "percentage": float((data["total"] / total_expenses * 100).quantize(Decimal('0.01'))) if total_expenses > 0 else 0
+        })
+
+    method_summary = {}
+    for e in expenses:
+        pm = (e.payment_method or "efectivo").lower()
+        if "efectivo" in pm or "cash" in pm:
+            label = "Efectivo"
+        elif "tarjeta" in pm or "card" in pm:
+            label = "Tarjeta"
+        elif "transfer" in pm:
+            label = "Transferencia"
+        else:
+            label = pm.capitalize()
+
+        if label not in method_summary:
+            method_summary[label] = {"method": label, "total": Decimal('0.00'), "count": 0}
+        method_summary[label]["total"] += Decimal(str(e.amount))
+        method_summary[label]["count"] += 1
+
+    method_chart_data = [
+        {"method": m, "total": float(d["total"]), "count": d["count"]}
+        for m, d in method_summary.items()
+    ]
+
+    daily_summary = {}
+    curr_dt = start_dt
+    while curr_dt <= end_dt:
+        d_str = curr_dt.strftime("%Y-%m-%d")
+        daily_summary[d_str] = Decimal('0.00')
+        curr_dt += timedelta(days=1)
+
+    for e in expenses:
+        d_str = e.date_created.strftime("%Y-%m-%d")
+        if d_str in daily_summary:
+            daily_summary[d_str] += Decimal(str(e.amount))
+
+    daily_chart_data = [
+        {"date": d, "monto": float(amt)}
+        for d, amt in sorted(daily_summary.items())
+    ]
+
+    expenses_list = []
+    for e in expenses:
+        c_info = categories_map.get(e.category_id, {"name": "General", "color": "#6366f1", "icon": "receipt"})
+        user_id_str = str(e.session.user_id) if e.session and e.session.user_id else ""
+        user_name = users_map.get(user_id_str, user_id_str or "Cajero/Vendedor")
+        register_name = e.session.cash_register.name if (e.session and e.session.cash_register) else "Caja General"
+
+        expenses_list.append({
+            "id": str(e.id),
+            "date": e.date_created.isoformat(),
+            "date_formatted": e.date_created.strftime("%d/%m/%Y %H:%M"),
+            "category_id": str(e.category_id),
+            "category_name": c_info["name"],
+            "category_color": c_info["color"],
+            "category_icon": c_info["icon"],
+            "glosa": e.glosa or "Sin descripción",
+            "amount": float(e.amount),
+            "payment_method": e.payment_method or "efectivo",
+            "user_name": user_name,
+            "cash_register": register_name,
+            "session_id": str(e.session_id)
+        })
+
+    return {
+        "kpis": {
+            "total_expenses": float(total_expenses),
+            "total_count": total_count,
+            "avg_expense": float(avg_expense),
+            "top_category": top_category_name
+        },
+        "chart_data": daily_chart_data,
+        "category_chart_data": category_chart_data,
+        "method_chart_data": method_chart_data,
+        "expenses": expenses_list
+    }
+
+
+@router.get("/reports/expenses/export")
+def export_expenses_report_excel(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    category_id: Optional[UUID] = Query(None),
+    payment_method: Optional[str] = Query(None),
+    branch_id: Optional[UUID] = Query(None, alias="branch_id"),
+    db: TenantSession = Depends(get_tenant_session)
+):
+    import io
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from fastapi.responses import StreamingResponse
+
+    start_dt = parse_date(start_date) or (datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=30))
+    end_dt = parse_date(end_date) or datetime.utcnow()
+
+    if len(end_date or "") <= 10:
+        end_dt = end_dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+    query = db.tenant_query(Expense).join(Expense.session).filter(
+        Expense.date_created >= start_dt,
+        Expense.date_created <= end_dt
+    )
+
+    if category_id:
+        query = query.filter(Expense.category_id == category_id)
+
+    if payment_method and payment_method != "all":
+        query = query.filter(Expense.payment_method.ilike(f"%{payment_method}%"))
+
+    if branch_id and branch_id != "all":
+        query = query.join(CashSession.cash_register).filter(
+            (CashRegister.branch_id == branch_id) | (CashRegister.branch_id.is_(None))
+        )
+
+    expenses = query.order_by(desc(Expense.date_created)).all()
+
+    all_users = db.tenant_query(User).all()
+    users_map = {}
+    for u in all_users:
+        disp_name = u.full_name or u.username
+        users_map[u.username] = disp_name
+        users_map[str(u.id)] = disp_name
+
+    categories_map = {c.id: c.name for c in db.tenant_query(ExpenseCategory).all()}
+
+    wb = openpyxl.Workbook()
+
+    HEADER_FILL = PatternFill("solid", fgColor="1A1A2E")
+    HEADER_FONT = Font(bold=True, color="FFFFFF", size=11)
+    TOTAL_FILL = PatternFill("solid", fgColor="E2F0D9")
+    TOTAL_FONT = Font(bold=True, size=11)
+    thin_side = Side(style="thin", color="CCCCCC")
+    BORDER = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
+
+    def style_header(ws, cols):
+        for c in range(1, cols + 1):
+            cell = ws.cell(row=1, column=c)
+            cell.fill = HEADER_FILL
+            cell.font = HEADER_FONT
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.border = BORDER
+
+    def auto_width(ws):
+        for col in ws.columns:
+            max_len = max(len(str(cell.value or '')) for cell in col)
+            col_letter = openpyxl.utils.get_column_letter(col[0].column)
+            ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
+
+    ws1 = wb.active
+    ws1.title = "Historial Gastos"
+    headers1 = ["Nº", "Fecha y Hora", "Categoría", "Descripción / Glosa", "Método Pago", "Cajero / Usuario", "Terminal / Caja", "Monto"]
+    for j, h in enumerate(headers1, 1):
+        ws1.cell(row=1, column=j, value=h)
+    style_header(ws1, len(headers1))
+
+    total_sum = Decimal('0.00')
+    for i, e in enumerate(expenses, start=2):
+        c_name = categories_map.get(e.category_id, "General")
+        u_str = str(e.session.user_id) if e.session and e.session.user_id else ""
+        u_name = users_map.get(u_str, u_str or "Cajero")
+        reg_name = e.session.cash_register.name if (e.session and e.session.cash_register) else "Caja General"
+        amt = float(e.amount or 0)
+        total_sum += Decimal(str(e.amount or 0))
+
+        ws1.cell(row=i, column=1, value=i - 1)
+        ws1.cell(row=i, column=2, value=e.date_created.strftime("%d/%m/%Y %H:%M"))
+        ws1.cell(row=i, column=3, value=c_name)
+        ws1.cell(row=i, column=4, value=e.glosa or "Sin descripción")
+        ws1.cell(row=i, column=5, value=(e.payment_method or "efectivo").capitalize())
+        ws1.cell(row=i, column=6, value=u_name)
+        ws1.cell(row=i, column=7, value=reg_name)
+        cell_amt = ws1.cell(row=i, column=8, value=amt)
+        cell_amt.number_format = '"$"#,##0.00'
+
+        for col_idx in range(1, 9):
+            ws1.cell(row=i, column=col_idx).border = BORDER
+
+    last_row = len(expenses) + 2
+    ws1.cell(row=last_row, column=1, value="TOTAL")
+    ws1.cell(row=last_row, column=8, value=float(total_sum)).number_format = '"$"#,##0.00'
+    for c in range(1, 9):
+        cell = ws1.cell(row=last_row, column=c)
+        cell.fill = TOTAL_FILL
+        cell.font = TOTAL_FONT
+        cell.border = BORDER
+
+    auto_width(ws1)
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    filename = f"gastos_{start_dt.strftime('%Y%m%d')}_{end_dt.strftime('%Y%m%d')}.xlsx"
     return StreamingResponse(
         buffer,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

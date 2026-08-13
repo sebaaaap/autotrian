@@ -10,7 +10,8 @@ import {
     LogOut,
     Settings,
     Users,
-    Monitor
+    Monitor,
+    Receipt
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,7 @@ const menuItems = [
     { href: "/dashboard", label: "Panel de Reportes", icon: LayoutDashboard, roles: ['admin'] },
     { href: "/dashboard/clientes", label: "Clientes", icon: Users, roles: ['admin', 'vendedor'] },
     { href: "/dashboard/reportes/ventas", label: "Reportes de Ventas", icon: BarChart3, roles: ['admin'] },
+    { href: "/dashboard/reportes/gastos", label: "Reportes de Gastos", icon: Receipt, roles: ['admin'] },
     { href: "/dashboard/reportes/compras", label: "Reportes de Compras", icon: ShoppingBag, roles: ['admin'] },
     { href: "/dashboard/reportes/inventario", label: "Reportes de Inventario", icon: Package, roles: ['admin'] },
 ];

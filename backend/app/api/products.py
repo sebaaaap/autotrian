@@ -787,6 +787,7 @@ def separate_scrap(
             category=parent.category,
             location_id=parent.location_id,
             branch_id=parent.branch_id,
+            company_id=parent.company_id,
             is_raw_material=False,
             is_scrap=True,
             scrap_parent_id=parent.id,

@@ -142,6 +142,44 @@ export const apiService = {
         return response.data;
     },
 
+    async getReportExpenses(startDate?: string, endDate?: string, categoryId?: string, paymentMethod?: string, branchId?: string): Promise<any> {
+        const params: any = {};
+        if (startDate) params.start_date = startDate;
+        if (endDate) params.end_date = endDate;
+        if (categoryId && categoryId !== 'all') params.category_id = categoryId;
+        if (paymentMethod && paymentMethod !== 'all') params.payment_method = paymentMethod;
+        if (branchId && branchId !== 'all') params.branch_id = branchId;
+        const response = await api.get("/reports/expenses/summary", { params });
+        return response.data;
+    },
+
+    async exportExpensesExcel(startDate?: string, endDate?: string, categoryId?: string, paymentMethod?: string, branchId?: string): Promise<void> {
+        const params: any = {};
+        if (startDate) params.start_date = startDate;
+        if (endDate) params.end_date = endDate;
+        if (categoryId && categoryId !== 'all') params.category_id = categoryId;
+        if (paymentMethod && paymentMethod !== 'all') params.payment_method = paymentMethod;
+        if (branchId && branchId !== 'all') params.branch_id = branchId;
+        const response = await api.get("/reports/expenses/export", {
+            params,
+            responseType: "blob",
+        });
+        const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.style.display = "none";
+        link.href = url;
+        const from = startDate ? startDate.replace(/-/g, "") : "inicio";
+        const to = endDate ? endDate.replace(/-/g, "") : "hoy";
+        link.setAttribute("download", `gastos_${from}_${to}.xlsx`);
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+            if (document.body.contains(link)) document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        }, 1000);
+    },
+
     async exportSalesExcel(startDate?: string, endDate?: string, branchId?: string): Promise<void> {
         const params: any = {};
         if (startDate) params.start_date = startDate;

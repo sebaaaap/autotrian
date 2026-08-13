@@ -28,6 +28,7 @@ export default function DashboardLayout({
     let title = "Reportes";
     if (isClientesPage) title = "Gestión de Clientes";
     else if (pathname.includes("/reportes/ventas")) title = "Reportes de Ventas";
+    else if (pathname.includes("/reportes/gastos")) title = "Reportes de Gastos";
     else if (pathname.includes("/reportes/compras")) title = "Reportes de Compras";
     else if (pathname.includes("/reportes/inventario")) title = "Reportes de Inventario";
 

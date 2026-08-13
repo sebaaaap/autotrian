@@ -3,7 +3,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { BarChart3, ShoppingBag, Package, TrendingUp } from "lucide-react";
+import { BarChart3, ShoppingBag, Package, TrendingUp, Receipt } from "lucide-react";
 
 export default function DashboardPage() {
     return (
@@ -15,7 +15,7 @@ export default function DashboardPage() {
                 </p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Link href="/dashboard/reportes/ventas">
                     <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer border-2 hover:border-primary">
                         <div className="flex items-center gap-4">
@@ -26,6 +26,22 @@ export default function DashboardPage() {
                                 <h3 className="font-semibold text-lg">Reportes de Ventas</h3>
                                 <p className="text-sm text-muted-foreground">
                                     Ventas, caja y rentabilidad
+                                </p>
+                            </div>
+                        </div>
+                    </Card>
+                </Link>
+
+                <Link href="/dashboard/reportes/gastos">
+                    <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer border-2 hover:border-primary">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-red-500/10 rounded-lg">
+                                <Receipt className="h-6 w-6 text-red-600" />
+                            </div>
+                            <div>
+                                <h3 className="font-semibold text-lg">Reportes de Gastos</h3>
+                                <p className="text-sm text-muted-foreground">
+                                    Egresos y compras al paso
                                 </p>
                             </div>
                         </div>

@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
-import { BarChart3, ShoppingBag, Package, TrendingUp, FileText, DollarSign } from "lucide-react";
+import { BarChart3, ShoppingBag, Package, TrendingUp, FileText, DollarSign, Receipt } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import PosReports from "@/components/reportesLOVABLE/puntodeventareporte";
 import InventoryReports from "@/components/reportesLOVABLE/inventarioreporte";
 import PurchasesReport from "@/components/reportesLOVABLE/comprasreporte";
+import ExpensesReport from "@/components/reportesLOVABLE/gastosreporte";
 
 export default function ReportesModule() {
     return (
@@ -15,7 +16,7 @@ export default function ReportesModule() {
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Reportes</h1>
                     <p className="text-muted-foreground mt-1">
-                        Ventas, compras e inventario
+                        Ventas, compras, egresos e inventario
                     </p>
                 </div>
             </div>
@@ -25,6 +26,10 @@ export default function ReportesModule() {
                     <TabsTrigger value="ventas" className="gap-2 data-[state=active]:shadow-sm">
                         <BarChart3 size={14} />
                         <span>Ventas</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="gastos" className="gap-2 data-[state=active]:shadow-sm">
+                        <Receipt size={14} />
+                        <span>Gastos</span>
                     </TabsTrigger>
                     <TabsTrigger value="inventario" className="gap-2 data-[state=active]:shadow-sm">
                         <Package size={14} />
@@ -38,6 +43,10 @@ export default function ReportesModule() {
 
                 <TabsContent value="ventas">
                     <PosReports />
+                </TabsContent>
+
+                <TabsContent value="gastos">
+                    <ExpensesReport />
                 </TabsContent>
 
                 <TabsContent value="inventario">
