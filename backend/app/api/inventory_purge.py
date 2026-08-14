@@ -53,6 +53,15 @@ def _get_last_activity_map(db: TenantSession, company_id) -> dict:
     return {r[0]: r[1] for r in rows}
 
 
+def _as_naive(dt):
+    """Normaliza a datetime naive (UTC) para comparaciones seguras."""
+    if dt is None:
+        return None
+    if dt.tzinfo is not None:
+        return dt.replace(tzinfo=None)
+    return dt
+
+
 @router.get("/purge/preview")
 def purge_preview(
     days_unused: int = 30,
@@ -97,7 +106,8 @@ def purge_preview(
     for p in products:
         if p.is_scrap:
             continue
-        last_mov = last_activity.get(p.id)
+        last_mov = _as_naive(last_activity.get(p.id))
+        p_created = _as_naive(p.created_at)
         reasons = []
         if float(p.stock_quantity or 0) == 0:
             reasons.append("zero_stock")
@@ -105,7 +115,7 @@ def purge_preview(
             reasons.append("never_sold")
         if last_mov and last_mov < cutoff:
             reasons.append("unused")
-        elif not last_mov and p.created_at and p.created_at < cutoff:
+        elif not last_mov and p_created and p_created < cutoff:
             reasons.append("unused")
 
         # Regla: eliminar si tiene TODAS las condiciones de riesgo
