@@ -11,6 +11,7 @@ interface Notification {
     user_name: string | null;
     action: string;
     entity_type: string | null;
+    company_name?: string | null;
     description: string;
     severity: "info" | "action" | "warning" | "critical";
     is_read: boolean;
@@ -187,7 +188,12 @@ export function NotificationBell() {
                                                 </button>
                                             )}
                                         </div>
-                                        <div className="flex items-center gap-2 mt-1">
+                                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                            {n.company_name && (
+                                                <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-100 dark:bg-indigo-500/10 px-1.5 py-0.5 rounded">
+                                                    {n.company_name}
+                                                </span>
+                                            )}
                                             <span className="text-[10px] text-muted-foreground">
                                                 {n.user_name || n.user_id}
                                             </span>

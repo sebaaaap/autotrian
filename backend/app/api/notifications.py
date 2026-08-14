@@ -24,15 +24,35 @@ def get_notifications(
 ):
     """
     Feed de notificaciones (activity logs) de la empresa.
-    Devuelve también el contador de no leídas para el badge.
+    El superadmin ve logs de TODAS las empresas (modo auditoría) con el nombre de cada una.
     """
-    company_id = current_user.company_id
-    if not company_id:
-        return {"notifications": [], "unread_count": 0}
+    user_role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
 
-    logs = activity_service.get_recent_logs(
-        db._db, company_id, days=days, limit=limit, only_unread=only_unread
-    )
+    from app.models.base import ActivityLog, Company
+    from datetime import datetime, timedelta
+    from sqlalchemy import or_
+
+    since = datetime.utcnow() - timedelta(days=days)
+    base_q = db._db.query(ActivityLog).filter(ActivityLog.created_at >= since)
+
+    if user_role == "superadmin" and not current_user.company_id:
+        # Superadmin: todas las empresas
+        q = base_q
+        companies_map = {c.id: c.name for c in db._db.query(Company).all()}
+    else:
+        company_id = current_user.company_id
+        if not company_id:
+            return {"notifications": [], "unread_count": 0}
+        q = base_q.filter(ActivityLog.company_id == company_id)
+        companies_map = {}
+
+    if only_unread:
+        q = q.filter(ActivityLog.is_read == False)
+
+    # Contar no leídas ANTES del limit
+    unread_count = q.filter(ActivityLog.is_read == False).count()
+
+    logs = q.order_by(ActivityLog.created_at.desc()).limit(limit).all()
 
     return {
         "notifications": [
@@ -42,6 +62,7 @@ def get_notifications(
                 "user_name": l.user_name,
                 "action": l.action,
                 "entity_type": l.entity_type,
+                "company_name": companies_map.get(l.company_id),
                 "description": l.description,
                 "severity": l.severity.value if hasattr(l.severity, "value") else str(l.severity),
                 "is_read": l.is_read,
