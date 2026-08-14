@@ -8,7 +8,7 @@ from app.api import (
     sessions, products, locations, suppliers,
     categories, reports, users, quotes, reception,
     printing, branches, expenses, payment_methods,
-    superadmin, companies, notifications
+    superadmin, companies, notifications, inventory_purge
 )
 import os, traceback
 
@@ -89,6 +89,7 @@ app.include_router(expenses.router, prefix="/api/v1/expenses", tags=["Expenses"]
 app.include_router(payment_methods.router, prefix="/api/v1/payment-methods", tags=["Payment Methods"])
 app.include_router(superadmin.router, prefix="/api/v1/superadmin", tags=["Super Admin"])
 app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["Notifications"])
+app.include_router(inventory_purge.router, prefix="/api/v1/inventory", tags=["Inventory Purge"])
 
 @app.get("/")
 def root():

@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState } from "react";
-import { Package, MapPin, Settings2, ArrowLeft } from "lucide-react";
+import { Package, MapPin, Settings2, ArrowLeft, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ProductsPage } from "@/components/inventory/products-page";
 import { LocationsPage } from "@/components/inventory/locations-page";
 import { ActionsPage } from "@/components/inventory/actions-page";
+import { PurgePage } from "@/components/inventory/purge-page";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 
 export default function InventoryPage() {
@@ -53,6 +54,13 @@ export default function InventoryPage() {
                                 <Settings2 size={14} />
                                 <span>Acciones</span>
                             </TabsTrigger>
+                            <TabsTrigger
+                                value="purge"
+                                className="flex items-center gap-2 px-6 py-2 rounded-lg text-xs font-semibold text-red-600 data-[state=active]:bg-red-50 dark:data-[state=active]:bg-red-500/10 data-[state=active]:text-red-700 data-[state=active]:shadow-sm transition-all"
+                            >
+                                <ShieldAlert size={14} />
+                                <span>Depuración</span>
+                            </TabsTrigger>
                         </TabsList>
                     </Tabs>
 
@@ -69,6 +77,9 @@ export default function InventoryPage() {
                         </TabsContent>
                         <TabsContent value="actions" className="m-0 h-full border-none p-0 outline-none">
                             <ActionsPage />
+                        </TabsContent>
+                        <TabsContent value="purge" className="m-0 h-full border-none p-0 outline-none">
+                            <PurgePage />
                         </TabsContent>
                     </Tabs>
                 </main>
