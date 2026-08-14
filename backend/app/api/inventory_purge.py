@@ -34,13 +34,22 @@ class PurgeExecuteRequest(BaseModel):
     include_orphan_locations: bool = False  # ubicaciones sin productos
 
 
-def _get_last_activity_map(db: TenantSession) -> dict:
-    """product_id → fecha del último movimiento de inventario."""
-    rows = db._db.query(
-        InventoryMovementItem.product_id,
-        func.max(InventoryMovementItem.created_at),
-    ).all()
-    # Nota: se filtra por company vía tenant filter del contexto de request
+def _get_last_activity_map(db: TenantSession, company_id) -> dict:
+    """product_id → fecha del último movimiento de inventario (por empresa)."""
+    from app.models.base import InventoryMovement, TenantModel
+    from sqlalchemy import and_
+    from sqlalchemy.orm import with_loader_criteria
+
+    rows = (
+        db._db.query(
+            InventoryMovementItem.product_id,
+            func.max(InventoryMovementItem.created_at),
+        )
+        .join(InventoryMovement, InventoryMovement.id == InventoryMovementItem.movement_id)
+        .filter(InventoryMovement.company_id == company_id)
+        .group_by(InventoryMovementItem.product_id)
+        .all()
+    )
     return {r[0]: r[1] for r in rows}
 
 
@@ -54,13 +63,32 @@ def purge_preview(
     DRY-RUN: muestra exactamente qué se eliminaría. No modifica nada.
     """
     cutoff = datetime.utcnow() - timedelta(days=days_unused)
-    last_activity = _get_last_activity_map(db)
+
+    company_id = current_user.company_id
+    if not company_id:
+        # Superadmin: usar la última empresa (misma lógica que email reports)
+        from app.models.base import Company
+        company = db._db.query(Company).order_by(Company.created_at.desc()).first()
+        if not company:
+            raise HTTPException(status_code=400, detail="No hay empresas")
+        company_id = company.id
+
+    last_activity = _get_last_activity_map(db, company_id)
 
     products = db.tenant_query(Product).filter(Product.is_active == True).all()
+    # Asegurar scope de empresa si el TenantSession viene sin company (superadmin)
+    if not db.company_id:
+        products = [p for p in products if p.company_id == company_id]
 
-    # Ventas históricas por producto
+    # Ventas históricas por producto (filtrado por empresa)
+    from app.models.base import Ticket
     sold_product_ids = {
-        r[0] for r in db._db.query(SaleItem.product_id).distinct().all()
+        r[0] for r in (
+            db._db.query(SaleItem.product_id)
+            .join(Ticket, Ticket.id == SaleItem.ticket_id)
+            .filter(Ticket.company_id == company_id)
+            .distinct().all()
+        )
     }
 
     to_delete = []
