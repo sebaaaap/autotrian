@@ -71,7 +71,7 @@ def get_notifications(
             }
             for l in logs
         ],
-        "unread_count": activity_service.count_unread(db._db, company_id),
+        "unread_count": unread_count,
     }
 
 
