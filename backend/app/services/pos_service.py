@@ -307,6 +307,19 @@ class POSService:
 
             db.commit()
             db.refresh(ticket)
+
+            # ── Check stock bajo en los productos vendidos ──
+            try:
+                from app.services.activity_service import check_low_stock
+                sold_product_ids = {i["product_id"] for i in final_items_to_create}
+                for pid in sold_product_ids:
+                    prod = db.query(Product).filter(Product.id == pid).first()
+                    if prod:
+                        check_low_stock(db._db, prod.company_id, prod, auto_commit=False)
+                db._db.commit()
+            except Exception as e:
+                print(f"[activity_log] stock check skipped: {e}")
+
             return ticket
         except HTTPException:
             db.rollback()

@@ -249,6 +249,24 @@ async def import_products(
                 product.stock_quantity += stock
                 
         db.commit()
+
+        # ── Activity log: importación Excel ──
+        try:
+            from app.services.activity_service import log_activity, Actions
+            from app.models.base import ActivityLog
+            count = len(df)
+            log_activity(
+                db._db, current_user.company_id, current_user,
+                Actions.PRODUCT_IMPORTED,
+                f"Importó {count} productos desde Excel",
+                entity_type="product",
+                severity=ActivityLog.Severity.ACTION,
+                metadata={"rows": count, "file": file.filename},
+            )
+            db._db.commit()
+        except Exception:
+            pass
+
         return {"detail": "Importación completada correctamente"}
     except Exception as e:
         db.rollback()
@@ -319,6 +337,18 @@ def create_product(
             
         db.commit()
         db.refresh(db_product)
+
+        # ── Activity log ──
+        from app.services.activity_service import log_activity, Actions
+        log_activity(
+            db._db, db_product.company_id, current_user,
+            Actions.PRODUCT_CREATED,
+            f"Creó el producto '{db_product.name}'",
+            entity_type="product", entity_id=db_product.id,
+            metadata={"barcode": db_product.barcode, "price": float(db_product.price or 0)},
+        )
+        db._db.commit()
+
         return db_product
     except Exception as e:
         db.rollback()

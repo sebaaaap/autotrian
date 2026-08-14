@@ -3,6 +3,7 @@
 // import useSWR from "swr" // OT_HIDDEN: re-enable with OT indicator
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { NotificationBell } from "@/components/shared/NotificationBell"
 import { useSettings } from "@/hooks/useSettings"
 import type { Order } from "./pdv-types"
 import {
@@ -253,6 +254,11 @@ export function PdvHeader({
           <Clock className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Órdenes</span>
         </Button>
+
+        <div className="h-6 w-px bg-border" />
+
+        {/* Notificaciones */}
+        <NotificationBell />
 
         <div className="h-6 w-px bg-border" />
 

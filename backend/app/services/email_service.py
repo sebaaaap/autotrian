@@ -329,6 +329,18 @@ def send_report_email(
             detail=f"Error enviando correo: {resp.text}"
         )
 
+    # ── Activity log: correo enviado ──
+    try:
+        from app.services.activity_service import log_activity, Actions
+        log_activity(db, company_id, None,
+                     Actions.EMAIL_REPORT_SENT,
+                     f"Reporte {label} enviado por correo a {len(recipient_emails)} destinatario(s)",
+                     entity_type="email",
+                     metadata={"period": label, "recipients": recipient_emails},
+                     auto_commit=True)
+    except Exception:
+        pass
+
     return {
         "status": "ok",
         "period": label,

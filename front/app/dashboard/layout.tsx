@@ -1,6 +1,7 @@
 "use client";
 
 import { Sidebar } from "@/components/backend/sidebar";
+import { NotificationBell } from "@/components/shared/NotificationBell";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
@@ -43,6 +44,7 @@ export default function DashboardLayout({
                             <div className="w-full flex-1">
                                 <h1 className="text-lg font-semibold">{title}</h1>
                             </div>
+                            <NotificationBell />
                         </header>
                     )}
 

@@ -29,7 +29,17 @@ def login_for_access_token(
     access_token = security.create_access_token(
         subject=user.username
     )
-    
+
+    # ── Activity log: login ──
+    try:
+        from app.services.activity_service import log_activity, Actions
+        if user.company_id:
+            log_activity(db, user.company_id, user, Actions.USER_LOGIN,
+                         f"Inició sesión", entity_type="user", entity_id=user.id)
+            db.commit()
+    except Exception:
+        pass
+
     return {
         "access_token": access_token,
         "token_type": "bearer",

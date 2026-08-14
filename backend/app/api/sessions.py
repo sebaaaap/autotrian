@@ -74,7 +74,22 @@ def open_session(
     Abre una nueva sesión de caja vinculada a una terminal.
     Si el usuario ya tiene una o la caja está ocupada, fallará.
     """
-    return SessionService.open_session(db, data)
+    result = SessionService.open_session(db, data)
+
+    # ── Activity log ──
+    try:
+        from app.services.activity_service import log_activity, Actions
+        from app.models.base import ActivityLog
+        log_activity(db._db, current_user.company_id, current_user,
+                     Actions.CASH_OPENED,
+                     f"Abrió caja (saldo inicial ${data.opening_balance:,.0f})".replace(",", "."),
+                     entity_type="cash", entity_id=result.id,
+                     severity=ActivityLog.Severity.INFO)
+        db._db.commit()
+    except Exception:
+        pass
+
+    return result
 
 @router.post("/{session_id}/close", response_model=CashSessionResponse)
 def close_session(
@@ -84,7 +99,22 @@ def close_session(
     current_user = Depends(check_roles(["admin", "vendedor"]))
 ):
     """Cierra la sesión y realiza el arqueo"""
-    return SessionService.close_session(db, session_id, data)
+    result = SessionService.close_session(db, session_id, data)
+
+    # ── Activity log ──
+    try:
+        from app.services.activity_service import log_activity, Actions
+        from app.models.base import ActivityLog
+        log_activity(db._db, current_user.company_id, current_user,
+                     Actions.CASH_CLOSED,
+                     f"Cerró caja (saldo final ${data.closing_balance:,.0f})".replace(",", "."),
+                     entity_type="cash", entity_id=session_id,
+                     severity=ActivityLog.Severity.INFO)
+        db._db.commit()
+    except Exception:
+        pass
+
+    return result
 
 @router.get("/active", response_model=Optional[CashSessionResponse])
 def get_active_session(

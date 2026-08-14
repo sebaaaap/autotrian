@@ -654,3 +654,29 @@ class Expense(TenantModel):
     category = relationship("ExpenseCategory", back_populates="expenses")
     session = relationship("CashSession")
 
+
+
+# ── Activity Log / Notifications ──────────────────────────────────────────
+
+class ActivityLog(TenantModel):
+    """Audit log del sistema: quién hizo qué y cuándo.
+    Se muestra como notificaciones (campanita) y feed estilo git-log.
+    Retención: 6 meses (cleanup automático).
+    """
+    __tablename__ = "activity_logs"
+
+    class Severity(enum.Enum):
+        INFO = "info"          # ⚪ sistema normal (caja, login)
+        ACTION = "action"      # 🔵 acciones de usuario (crear, mover, editar)
+        WARNING = "warning"    # 🟡 atención (stock mínimo, ajustes)
+        CRITICAL = "critical"  # 🔴 stock bajo, depuración, borrados
+
+    user_id = Column(String, index=True, nullable=False)      # username del actor
+    user_name = Column(String, nullable=True)                  # nombre para mostrar
+    action = Column(String, index=True, nullable=False)        # "product.created", "stock.low", ...
+    entity_type = Column(String, nullable=True, index=True)    # "product", "user", "location", "cash", "inventory", "email"
+    entity_id = Column(UUID(as_uuid=True), nullable=True)
+    description = Column(Text, nullable=False)                 # "María creó el producto 'Filtro'"
+    severity = Column(Enum(Severity), default=Severity.ACTION, nullable=False)
+    is_read = Column(Boolean, default=False, index=True)       # para el badge de la campanita
+    metadata_json = Column("metadata", JSON, nullable=True)    # extra: stock antes/después, etc.

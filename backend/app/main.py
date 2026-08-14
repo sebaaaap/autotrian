@@ -8,7 +8,7 @@ from app.api import (
     sessions, products, locations, suppliers,
     categories, reports, users, quotes, reception,
     printing, branches, expenses, payment_methods,
-    superadmin, companies
+    superadmin, companies, notifications
 )
 import os, traceback
 
@@ -88,6 +88,7 @@ app.include_router(companies.router, prefix="/api/v1/companies", tags=["Companie
 app.include_router(expenses.router, prefix="/api/v1/expenses", tags=["Expenses"])
 app.include_router(payment_methods.router, prefix="/api/v1/payment-methods", tags=["Payment Methods"])
 app.include_router(superadmin.router, prefix="/api/v1/superadmin", tags=["Super Admin"])
+app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["Notifications"])
 
 @app.get("/")
 def root():
@@ -116,6 +117,18 @@ def startup_event():
             if retries == 0:
                 raise RuntimeError("Critical Error: Cannot connect to PostgreSQL")
             time.sleep(2)
+
+    # Cleanup de activity logs > 6 meses (best-effort, no rompe el startup)
+    try:
+        from app.database import SessionLocal
+        from app.services.activity_service import cleanup_old_logs
+        db = SessionLocal()
+        deleted = cleanup_old_logs(db, days=180)
+        if deleted:
+            print(f"[activity_log] cleanup: {deleted} logs viejos eliminados")
+        db.close()
+    except Exception as e:
+        print(f"[activity_log] cleanup skipped: {e}")
 
 # ─── Debug: catch all 500s and return the real error ───────────────────────
 @app.exception_handler(Exception)

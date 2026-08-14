@@ -61,6 +61,18 @@ def create_user(
     db.add(db_obj)  # usa tenant_add internamente → auto company_id
     db.commit()
     db.refresh(db_obj)
+
+    # ── Activity log ──
+    try:
+        from app.services.activity_service import log_activity, Actions
+        log_activity(db._db, db_obj.company_id, current_user,
+                     Actions.USER_CREATED,
+                     f"Creó el usuario '{db_obj.username}' ({db_obj.role.value})",
+                     entity_type="user", entity_id=db_obj.id)
+        db._db.commit()
+    except Exception:
+        pass
+
     return db_obj
 
 @router.put("/{user_id}", response_model=UserResponse)
