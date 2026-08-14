@@ -141,6 +141,9 @@ export function PdvHeader({
           </div>
         </div>
 
+        {/* Notificaciones — junto al nombre del usuario */}
+        <NotificationBell />
+
         <div className="mx-2 h-6 w-px bg-border" />
 
         {/* OT_HIDDEN: Indicador de OT pendiente oculto. Reactivar con OTs. */}
@@ -254,11 +257,6 @@ export function PdvHeader({
           <Clock className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Órdenes</span>
         </Button>
-
-        <div className="h-6 w-px bg-border" />
-
-        {/* Notificaciones */}
-        <NotificationBell />
 
         <div className="h-6 w-px bg-border" />
 
