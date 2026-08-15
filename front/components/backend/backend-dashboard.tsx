@@ -11,6 +11,7 @@ import {
 } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { BranchSelector } from "@/components/shared/BranchSelector"
+import { NotificationBell } from "@/components/shared/NotificationBell"
 import { useSettings } from "@/hooks/useSettings"
 import { useRouter } from "next/navigation"
 
@@ -110,7 +111,9 @@ export function BackendDashboard({ onNavigate }: BackendDashboardProps) {
               </span>
             </div>
           </div>
-          
+
+          <NotificationBell />
+
           <div className="border-r border-border/60 pr-5">
             <BranchSelector />
           </div>
