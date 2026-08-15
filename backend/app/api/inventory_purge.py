@@ -32,6 +32,7 @@ class PurgeExecuteRequest(BaseModel):
     include_zero_stock: bool = True    # productos con stock 0
     include_never_sold: bool = True    # productos sin venta histórica
     include_orphan_locations: bool = False  # ubicaciones sin productos
+    created_after: Optional[str] = None  # modo rollback importación (YYYY-MM-DD)
 
 
 def _get_last_activity_map(db: TenantSession, company_id) -> dict:
@@ -65,13 +66,26 @@ def _as_naive(dt):
 @router.get("/purge/preview")
 def purge_preview(
     days_unused: int = 30,
+    created_after: Optional[str] = None,  # ISO date "2026-08-14" → modo rollback importación
     db: TenantSession = Depends(get_tenant_session),
     current_user=Depends(check_roles(["admin"])),
 ):
     """
     DRY-RUN: muestra exactamente qué se eliminaría. No modifica nada.
+
+    Modos:
+    - Normal: stock 0 Y (nunca vendido O sin movimiento en days_unused)
+    - Rollback (created_after): productos CREADOS después de esa fecha y NUNCA vendidos,
+      aunque tengan stock. Ideal para deshacer una importación mala de Excel.
     """
     cutoff = datetime.utcnow() - timedelta(days=days_unused)
+    rollback_mode = bool(created_after)
+    rollback_dt = None
+    if rollback_mode:
+        try:
+            rollback_dt = datetime.fromisoformat(created_after)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Fecha inválida. Usa formato YYYY-MM-DD")
 
     company_id = current_user.company_id
     if not company_id:
@@ -101,7 +115,7 @@ def purge_preview(
     }
 
     to_delete = []
-    reasons_count = {"zero_stock": 0, "never_sold": 0, "unused": 0}
+    reasons_count = {"zero_stock": 0, "never_sold": 0, "unused": 0, "rollback_import": 0}
 
     for p in products:
         if p.is_scrap:
@@ -109,29 +123,40 @@ def purge_preview(
         last_mov = _as_naive(last_activity.get(p.id))
         p_created = _as_naive(p.created_at)
         reasons = []
-        if float(p.stock_quantity or 0) == 0:
-            reasons.append("zero_stock")
-        if p.id not in sold_product_ids:
-            reasons.append("never_sold")
-        if last_mov and last_mov < cutoff:
-            reasons.append("unused")
-        elif not last_mov and p_created and p_created < cutoff:
-            reasons.append("unused")
 
-        # Regla: eliminar si tiene TODAS las condiciones de riesgo
-        # (stock 0 Y (nunca vendido O sin movimiento hace N días))
-        if "zero_stock" in reasons and ("never_sold" in reasons or "unused" in reasons):
-            to_delete.append({
-                "id": str(p.id),
-                "name": p.name,
-                "barcode": p.barcode,
-                "stock": float(p.stock_quantity or 0),
-                "created_at": p.created_at.isoformat() if p.created_at else None,
-                "reasons": reasons,
-            })
-            for r in reasons:
-                if r in reasons_count:
-                    reasons_count[r] += 1
+        if rollback_mode:
+            # Modo rollback importación: creado después de la fecha Y nunca vendido
+            if not (p_created and p_created >= rollback_dt):
+                continue  # creado antes de la fecha → no es parte de la importación
+            if p.id in sold_product_ids:
+                continue  # ya se vendió → NO borrar
+            reasons.append("rollback_import")
+            reasons.append("never_sold")
+        else:
+            # Modo normal: stock 0 Y (nunca vendido O sin movimientos)
+            if float(p.stock_quantity or 0) == 0:
+                reasons.append("zero_stock")
+            if p.id not in sold_product_ids:
+                reasons.append("never_sold")
+            if last_mov and last_mov < cutoff:
+                reasons.append("unused")
+            elif not last_mov and p_created and p_created < cutoff:
+                reasons.append("unused")
+
+            if "zero_stock" not in reasons or ("never_sold" not in reasons and "unused" not in reasons):
+                continue
+
+        to_delete.append({
+            "id": str(p.id),
+            "name": p.name,
+            "barcode": p.barcode,
+            "stock": float(p.stock_quantity or 0),
+            "created_at": p.created_at.isoformat() if p.created_at else None,
+            "reasons": reasons,
+        })
+        for r in reasons:
+            if r in reasons_count:
+                reasons_count[r] += 1
 
     # Ubicaciones huérfanas (sin productos activos con stock)
     orphan_locations = []
@@ -193,7 +218,9 @@ def purge_execute(
 
     # ── Re-calcular qué borrar (mismo criterio del preview) ──
     preview = purge_preview(
-        days_unused=data.days_unused, db=db, current_user=current_user
+        days_unused=data.days_unused,
+        created_after=data.created_after,
+        db=db, current_user=current_user,
     )
     product_ids = [UUID(p["id"]) for p in preview["products_to_delete"]]
 

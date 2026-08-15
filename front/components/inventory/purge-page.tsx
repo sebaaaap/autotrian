@@ -29,6 +29,7 @@ const reasonLabels: Record<string, string> = {
     zero_stock: "Stock 0",
     never_sold: "Nunca vendido",
     unused: "Sin movimiento",
+    rollback_import: "De importación",
 };
 
 export function PurgePage() {
@@ -37,6 +38,8 @@ export function PurgePage() {
     const [executing, setExecuting] = useState(false);
     const [daysUnused, setDaysUnused] = useState(30);
     const [includeOrphanLocations, setIncludeOrphanLocations] = useState(false);
+    const [rollbackMode, setRollbackMode] = useState(false);
+    const [createdAfter, setCreatedAfter] = useState("");
     const [search, setSearch] = useState("");
     const [companyName, setCompanyName] = useState("");
     const [myCompanyName, setMyCompanyName] = useState("");
@@ -62,14 +65,18 @@ export function PurgePage() {
         setLoading(true);
         setResult(null);
         try {
-            const res = await api.get(`/inventory/purge/preview?days_unused=${daysUnused}`);
+            let url = `/inventory/purge/preview?days_unused=${daysUnused}`;
+            if (rollbackMode && createdAfter) {
+                url += `&created_after=${createdAfter}`;
+            }
+            const res = await api.get(url);
             setPreview(res.data);
         } catch (err: any) {
             toast.error(err.response?.data?.detail || "Error cargando preview");
         } finally {
             setLoading(false);
         }
-    }, [daysUnused]);
+    }, [daysUnused, rollbackMode, createdAfter]);
 
     const executePurge = async () => {
         setExecuting(true);
@@ -80,6 +87,7 @@ export function PurgePage() {
                 include_zero_stock: true,
                 include_never_sold: true,
                 include_orphan_locations: includeOrphanLocations,
+                created_after: rollbackMode && createdAfter ? createdAfter : null,
             });
             toast.success(res.data?.message || "Depuración completada");
             setResult({
@@ -132,9 +140,32 @@ export function PurgePage() {
                             max={365}
                             value={daysUnused}
                             onChange={e => setDaysUnused(Number(e.target.value) || 30)}
-                            className="w-28 rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                            disabled={rollbackMode}
+                            className="w-28 rounded-xl border border-border bg-background px-3 py-2 text-sm disabled:opacity-40"
                         />
                     </div>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={rollbackMode}
+                            onChange={e => setRollbackMode(e.target.checked)}
+                            className="h-4 w-4"
+                        />
+                        <span className="font-semibold text-red-600">Deshacer importación Excel</span>
+                    </label>
+                    {rollbackMode && (
+                        <div>
+                            <label className="text-xs font-bold text-muted-foreground uppercase block mb-1.5">
+                                Productos creados desde
+                            </label>
+                            <input
+                                type="date"
+                                value={createdAfter}
+                                onChange={e => setCreatedAfter(e.target.value)}
+                                className="rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                            />
+                        </div>
+                    )}
                     <label className="flex items-center gap-2 text-sm cursor-pointer">
                         <input
                             type="checkbox"
@@ -144,13 +175,27 @@ export function PurgePage() {
                         />
                         Incluir ubicaciones huérfanas
                     </label>
-                    <Button onClick={loadPreview} disabled={loading} className="gap-2">
+                    <Button
+                        onClick={loadPreview}
+                        disabled={loading || (rollbackMode && !createdAfter)}
+                        className="gap-2"
+                    >
                         <FileSearch className="h-4 w-4" />
                         {loading ? "Analizando..." : "Analizar (dry-run)"}
                     </Button>
                 </div>
                 <p className="text-[11px] text-muted-foreground">
-                    Criterio: productos con <strong>stock 0</strong> Y que además <strong>nunca se han vendido</strong> o <strong>no tienen movimientos</strong> en el período.
+                    {rollbackMode ? (
+                        <>
+                            <strong className="text-red-600">Modo rollback:</strong> elimina todos los productos creados
+                            desde la fecha indicada que <strong>nunca se hayan vendido</strong>, aunque tengan stock.
+                            Los que ya se vendieron se conservan.
+                        </>
+                    ) : (
+                        <>
+                            Criterio: productos con <strong>stock 0</strong> Y que además <strong>nunca se han vendido</strong> o <strong>no tienen movimientos</strong> en el período.
+                        </>
+                    )}
                 </p>
             </div>
 
