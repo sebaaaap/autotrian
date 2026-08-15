@@ -131,6 +131,13 @@ def startup_event():
     except Exception as e:
         print(f"[activity_log] cleanup skipped: {e}")
 
+    # Scheduler de correos automáticos (diario/semanal/mensual)
+    try:
+        from app.services.email_scheduler import start_email_scheduler
+        start_email_scheduler()
+    except Exception as e:
+        print(f"[email_scheduler] no se pudo iniciar: {e}")
+
 # ─── Debug: catch all 500s and return the real error ───────────────────────
 @app.exception_handler(Exception)
 async def debug_exception_handler(request: Request, exc: Exception):
