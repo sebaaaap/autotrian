@@ -245,15 +245,20 @@ def purge_execute(
 
     try:
         # Borrado físico de productos (y sus relaciones)
+        from app.models.base import QuoteItem, WorkOrderItem, PurchaseItem
+
         for pid in product_ids:
-            # Relaciones primero
-            db._db.query(ProductSupplier).filter(ProductSupplier.product_id == pid).delete()
-            db._db.query(ProductBOM).filter(
-                (ProductBOM.product_id == pid) | (ProductBOM.component_id == pid)
-            ).delete()
+            # Limpiar TODAS las tablas que referencian productos (orden: hijos primero)
+            db._db.query(QuoteItem).filter(QuoteItem.product_id == pid).delete()
+            db._db.query(WorkOrderItem).filter(WorkOrderItem.product_id == pid).delete()
+            db._db.query(PurchaseItem).filter(PurchaseItem.product_id == pid).delete()
             db._db.query(SaleItem).filter(SaleItem.product_id == pid).delete()
             db._db.query(InventoryMovementItem).filter(
                 InventoryMovementItem.product_id == pid
+            ).delete()
+            db._db.query(ProductSupplier).filter(ProductSupplier.product_id == pid).delete()
+            db._db.query(ProductBOM).filter(
+                (ProductBOM.product_id == pid) | (ProductBOM.component_id == pid)
             ).delete()
             db._db.query(Product).filter(Product.id == pid).delete()
             deleted_products += 1
@@ -261,8 +266,13 @@ def purge_execute(
         # Ubicaciones huérfanas (opcional)
         if data.include_orphan_locations:
             for loc in preview["orphan_locations"]:
+                loc_uuid = UUID(loc["id"])
+                # Desvincular productos (stock 0) que aún referencian la ubicación
+                db._db.query(Product).filter(
+                    Product.location_id == loc_uuid
+                ).update({Product.location_id: None})
                 db._db.query(StorageLocation).filter(
-                    StorageLocation.id == UUID(loc["id"])
+                    StorageLocation.id == loc_uuid
                 ).delete()
                 deleted_locations += 1
 
