@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { NotificationBell } from "@/components/shared/NotificationBell"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -426,9 +427,12 @@ export default function SuperAdminPage() {
               <h1 className="text-3xl font-black tracking-tight">Super Admin</h1>
               <p className="text-white/70 text-sm mt-1">Panel de control de empresas y métricas de la plataforma</p>
             </div>
-            <Button onClick={() => setShowCreate(true)} className="bg-white text-violet-700 hover:bg-white/90 font-bold shadow-lg">
-              <Plus className="h-4 w-4 mr-2" /> Nuevo Cliente
-            </Button>
+            <div className="flex items-center gap-3">
+              <NotificationBell />
+              <Button onClick={() => setShowCreate(true)} className="bg-white text-violet-700 hover:bg-white/90 font-bold shadow-lg">
+                <Plus className="h-4 w-4 mr-2" /> Nuevo Cliente
+              </Button>
+            </div>
           </div>
         </div>
       </div>
