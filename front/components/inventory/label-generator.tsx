@@ -129,6 +129,7 @@ export interface LabelFields {
 }
 
 const LABEL_PRESETS = [
+    { id: "80x45", label: "80 × 45 mm", w: 80, h: 45 },
     { id: "50x25", label: "50 × 25 mm", w: 50, h: 25 },
     { id: "40x30", label: "40 × 30 mm", w: 40, h: 30 },
     { id: "58x40", label: "58 × 40 mm", w: 58, h: 40 },
@@ -147,9 +148,9 @@ export function LabelGenerator({
 }) {
     const [selected, setSelected] = useState<Record<string, number>>({});
     const [fields, setFields] = useState<LabelFields>({
-        name: true, barcode: true, internal_reference: false, category: false,
+        name: false, barcode: true, internal_reference: false, category: false,
     });
-    const [preset, setPreset] = useState("50x25");
+    const [preset, setPreset] = useState("80x45");
     const [customW, setCustomW] = useState(50);
     const [customH, setCustomH] = useState(25);
     const [copiesPerProduct, setCopiesPerProduct] = useState(1);
@@ -189,6 +190,9 @@ export function LabelGenerator({
 
     const nameSize = dims.h >= 30 ? 8 : 6.5;
     const refSize = dims.h >= 30 ? 6.5 : 5.5;
+    // Altura de barras: barcode-only ocupa casi toda la etiqueta
+    const barcodeOnly = !fields.name && !fields.internal_reference && !fields.category;
+    const barcodeH = barcodeOnly ? Math.max(50, dims.h * 2.4) : Math.max(35, dims.h * 1.4);
 
     return (
         <>
@@ -308,7 +312,7 @@ export function LabelGenerator({
                                         )}
                                         {fields.barcode && (
                                             <div className="flex-1 flex items-center justify-center min-h-0">
-                                                <BarcodeSVG value={selectedList[0].barcode} height={Math.max(35, dims.h * 1.4)} moduleWidth={1.05} showText={dims.h >= 25} />
+                                                <BarcodeSVG value={selectedList[0].barcode} height={barcodeH} moduleWidth={1.05} showText={dims.h >= 25} />
                                             </div>
                                         )}
                                         {fields.category && selectedList[0].category_name && (
@@ -368,7 +372,7 @@ export function LabelGenerator({
                                 )}
                                 {fields.barcode && (
                                     <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0 }}>
-                                        <BarcodeSVG value={p.barcode} height={Math.max(35, dims.h * 1.4)} moduleWidth={1.05} showText={dims.h >= 25} />
+                                        <BarcodeSVG value={p.barcode} height={barcodeH} moduleWidth={1.05} showText={dims.h >= 25} />
                                     </div>
                                 )}
                                 {fields.category && p.category_name && (
