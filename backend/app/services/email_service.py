@@ -329,6 +329,14 @@ def send_report_email(
             detail=f"Error enviando correo: {resp.text}"
         )
 
+    # Email ID de Resend para rastrear entrega en resend.com/emails
+    try:
+        resend_data = resp.json()
+    except Exception:
+        resend_data = {}
+    email_id = resend_data.get("id")
+    print(f"[EMAIL] Resend accepted — id={email_id} to={recipient_emails}", flush=True)
+
     # ── Activity log: correo enviado ──
     try:
         from app.services.activity_service import log_activity, Actions
@@ -336,7 +344,7 @@ def send_report_email(
                      Actions.EMAIL_REPORT_SENT,
                      f"Reporte {label} enviado por correo a {len(recipient_emails)} destinatario(s)",
                      entity_type="email",
-                     metadata={"period": label, "recipients": recipient_emails},
+                     metadata={"period": label, "recipients": recipient_emails, "resend_id": email_id},
                      auto_commit=True)
     except Exception:
         pass
@@ -346,4 +354,5 @@ def send_report_email(
         "period": label,
         "recipients": recipient_emails,
         "company": company_name,
+        "resend_email_id": email_id,
     }
