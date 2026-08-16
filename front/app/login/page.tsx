@@ -164,18 +164,6 @@ export default function LoginPage() {
                         <source src="/dinoparao_transparent.webm" type="video/webm" />
                         <source src="/dinoparao.mp4" type="video/mp4" />
                     </video>
-
-                    {/* Dino apoyado lado izquierdo (hmirror del derecho) */}
-                    <video
-                        autoPlay
-                        muted
-                        loop
-                        playsInline
-                        className="hidden lg:block absolute -top-[40px] -left-[270px] w-[320px] h-auto object-contain pointer-events-none z-0 opacity-95"
-                        style={{ transform: 'scaleX(-1)' }}
-                    >
-                        <source src="/apoyado_izq.webm" type="video/webm" />
-                    </video>
                 </div>
 
                 {/* Footer */}
