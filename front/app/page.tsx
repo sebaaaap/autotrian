@@ -328,7 +328,7 @@ export default function AppPage() {
         const order = { ...updated[orderIndex] }
         if (!order) return prev
 
-        const existing = order.lines.find((l) => l.product.barcode === product.barcode)
+        const existing = order.lines.find((l) => product.barcode ? l.product.barcode === product.barcode : l.product.id === product.id)
         let newLines: OrderLine[]
 
         if (existing) {
@@ -384,13 +384,8 @@ export default function AppPage() {
   const handleBarcodeSearch = useCallback(async (barcode: string) => {
     console.log("handleBarcodeSearch: Buscando barcode", barcode);
 
-    // 1. Prioridad: Búsqueda en memoria
-    let productToAdd = mappedProducts.find(p => p.barcode === barcode)
-
-    // 2. Si es Enter manual y no es barcode exacto, tomar primer resultado
-    if (!productToAdd && filteredProducts.length > 0) {
-      productToAdd = filteredProducts[0]
-    }
+    // 1. Prioridad: Búsqueda en memoria (match exacto por barcode)
+    const productToAdd = mappedProducts.find(p => p.barcode === barcode)
 
     if (productToAdd) {
       handleAddProduct(productToAdd)
@@ -398,6 +393,7 @@ export default function AppPage() {
       return
     }
 
+    // 2. Fallback: buscar en la API por barcode exacto
     try {
       const product = await apiService.getProductByBarcode(barcode)
       console.log("handleBarcodeSearch: Producto encontrado", product.name);

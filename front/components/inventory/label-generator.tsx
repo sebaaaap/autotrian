@@ -131,6 +131,7 @@ export interface LabelFields {
 }
 
 const LABEL_PRESETS = [
+    { id: "80x25", label: "80 × 25 mm", w: 80, h: 25 },
     { id: "80x45", label: "80 × 45 mm", w: 80, h: 45 },
     { id: "50x25", label: "50 × 25 mm", w: 50, h: 25 },
     { id: "40x30", label: "40 × 30 mm", w: 40, h: 30 },
@@ -152,7 +153,7 @@ export function LabelGenerator({
     const [fields, setFields] = useState<LabelFields>({
         name: true, barcode: true, internal_reference: true, category: false,
     });
-    const [preset, setPreset] = useState("80x45");
+    const [preset, setPreset] = useState("80x25");
     const [customW, setCustomW] = useState(50);
     const [customH, setCustomH] = useState(25);
     const [copiesPerProduct, setCopiesPerProduct] = useState(1);
