@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { Settings as SettingsIcon, Building2, Users, ArrowLeft, ShieldCheck, ChevronRight, CreditCard } from 'lucide-react';
+import { Settings as SettingsIcon, Building2, Users, ArrowLeft, ShieldCheck, ChevronRight, CreditCard, Mail } from 'lucide-react';
 import Link from 'next/link';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { BusinessInfo } from './business-info';
@@ -11,6 +11,7 @@ import { CashRegisterManagement } from './cash-register-management';
 import { BranchManagement } from './branch-management';
 import { PaymentMethodManagement } from './payment-method-management';
 import { ExpenseCategoryManagement } from './expense-category-management';
+import { EmailReportTest } from './email-report-test';
 import { useAuth } from '@/contexts/AuthContext';
 import { Monitor, Store, Receipt } from 'lucide-react';
 
@@ -130,6 +131,20 @@ export function SettingsPage() {
                                         </div>
                                         {activeTab === 'expenses' && <ChevronRight size={14} />}
                                     </button>
+
+                                    <button
+                                        onClick={() => setActiveTab('emailReports')}
+                                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${activeTab === 'emailReports'
+                                            ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20'
+                                            : 'text-muted-foreground hover:bg-muted font-medium'
+                                            }`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <Mail size={18} />
+                                            <span className="text-sm">Reportes por Correo</span>
+                                        </div>
+                                        {activeTab === 'emailReports' && <ChevronRight size={14} />}
+                                    </button>
                                 </nav>
                             </>
                         )}
@@ -222,6 +237,16 @@ export function SettingsPage() {
                                     <p className="text-sm text-muted-foreground mt-1">Administre las categorías para el registro de gastos rápidos.</p>
                                 </div>
                                 <ExpenseCategoryManagement />
+                            </div>
+                        )}
+
+                        {activeTab === 'emailReports' && isAdmin && (
+                            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                <div className="mb-8">
+                                    <h2 className="text-2xl font-bold text-foreground">Reportes por Correo</h2>
+                                    <p className="text-sm text-muted-foreground mt-1">Pruebe el envío manual y deje listo el flujo para administradores del negocio.</p>
+                                </div>
+                                <EmailReportTest />
                             </div>
                         )}
                     </div>
