@@ -191,7 +191,7 @@ export function LabelGenerator({
     return (
         <>
             {/* ── Panel de configuración (no se imprime) ── */}
-            <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 print:hidden">
+            <div id="label-config-panel" className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
                 <div className="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
                     <div className="flex items-center justify-between p-5 border-b border-border bg-muted/30">
                         <div className="flex items-center gap-2">
@@ -324,7 +324,7 @@ export function LabelGenerator({
             </div>
 
             {/* ── Zona imprimible: grid de etiquetas ── */}
-            <div className="hidden print:block">
+            <div id="label-print-area">
                 <div style={{
                     display: "flex",
                     flexWrap: "wrap",
@@ -366,25 +366,41 @@ export function LabelGenerator({
                 </div>
             </div>
 
-            {/* Estilos de impresión */}
-            <style jsx global>{`
-                @media print {
-                    @page {
-                        size: ${dims.w}mm ${dims.h}mm;
-                        margin: 0;
-                    }
-                    body * {
-                        visibility: hidden;
-                    }
-                    .print\\:hidden {
-                        display: none !important;
-                    }
-                    body {
-                        margin: 0;
-                        padding: 0;
-                    }
-                }
-            `}</style>
+            {/* Estilos: ocultar en pantalla, mostrar SOLO etiquetas al imprimir */}
+            <style
+                dangerouslySetInnerHTML={{
+                    __html: `
+                        #label-print-area { display: none; }
+
+                        @media print {
+                            @page {
+                                size: ${dims.w}mm ${dims.h}mm;
+                                margin: 0;
+                            }
+                            html, body {
+                                margin: 0 !important;
+                                padding: 0 !important;
+                                visibility: hidden;
+                                background: white !important;
+                            }
+                            #label-config-panel {
+                                display: none !important;
+                            }
+                            #label-print-area {
+                                display: block !important;
+                                visibility: visible;
+                                position: absolute;
+                                left: 0;
+                                top: 0;
+                                width: 100%;
+                            }
+                            #label-print-area * {
+                                visibility: visible;
+                            }
+                        }
+                    `,
+                }}
+            />
         </>
     );
 }
