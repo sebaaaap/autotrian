@@ -78,26 +78,28 @@ function BarcodeSVG({ value, height = 40, moduleWidth = 1.4, showText = true }: 
         x += barW + spaceW;
     }
     const totalW = x;
-    const textH = showText ? 10 : 0;
+    const textH = showText ? 12 : 0;
+    // Quiet zone: mínimo 10 módulos a cada lado (exigencia de scanners Code 128)
+    const quiet = 10 * moduleWidth;
 
     return (
         <svg
             width="100%"
-            height={height + textH}
-            viewBox={`0 0 ${totalW} ${height + textH}`}
-            preserveAspectRatio="none"
+            height="100%"
+            viewBox={`-${quiet} 0 ${totalW + quiet * 2} ${height + textH}`}
+            preserveAspectRatio="xMidYMid meet"
             style={{ display: "block" }}
         >
-            <rect x={0} y={0} width={totalW} height={height + textH} fill="white" />
+            <rect x={-quiet} y={0} width={totalW + quiet * 2} height={height + textH} fill="white" />
             {bars.map((b, i) => (
                 <rect key={i} x={b.x} y={0} width={b.w} height={height} fill="black" />
             ))}
             {showText && (
                 <text
                     x={totalW / 2}
-                    y={height + textH - 1}
+                    y={height + textH - 2}
                     textAnchor="middle"
-                    fontSize={textH - 2}
+                    fontSize={textH - 3}
                     fontFamily="monospace"
                     fill="black"
                 >
@@ -306,7 +308,7 @@ export function LabelGenerator({
                                         )}
                                         {fields.barcode && (
                                             <div className="flex-1 flex items-center justify-center min-h-0">
-                                                <BarcodeSVG value={selectedList[0].barcode} height={Math.max(16, dims.h * 0.5)} moduleWidth={1.05} showText={dims.h >= 25} />
+                                                <BarcodeSVG value={selectedList[0].barcode} height={Math.max(35, dims.h * 1.4)} moduleWidth={1.05} showText={dims.h >= 25} />
                                             </div>
                                         )}
                                         {fields.category && selectedList[0].category_name && (
@@ -366,7 +368,7 @@ export function LabelGenerator({
                                 )}
                                 {fields.barcode && (
                                     <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0 }}>
-                                        <BarcodeSVG value={p.barcode} height={Math.max(16, dims.h * 0.5)} moduleWidth={1.05} showText={dims.h >= 25} />
+                                        <BarcodeSVG value={p.barcode} height={Math.max(35, dims.h * 1.4)} moduleWidth={1.05} showText={dims.h >= 25} />
                                     </div>
                                 )}
                                 {fields.category && p.category_name && (
