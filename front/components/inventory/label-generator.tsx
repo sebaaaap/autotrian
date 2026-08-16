@@ -289,22 +289,29 @@ export function LabelGenerator({
                             <div>
                                 <label className="text-xs font-bold text-muted-foreground uppercase block mb-2">Vista previa (1ª etiqueta)</label>
                                 <div className="flex justify-center p-4 bg-muted/40 rounded-xl">
-                                    <div style={{ width: pxW, height: pxH }} className="bg-white border border-gray-300 overflow-hidden flex flex-col justify-between p-[2px]">
-                                        {fields.name && (
-                                            <div className="font-bold leading-none truncate text-center" style={{ fontSize: nameSize }}>
-                                                {selectedList[0].name}
+                                    <div style={{ width: pxW, height: pxH }} className="bg-white border border-gray-300 overflow-hidden flex flex-col p-[2px] gap-[1px]">
+                                        {(fields.name || fields.internal_reference) && (
+                                            <div className="text-center leading-none min-h-0">
+                                                {fields.name && (
+                                                    <div className="font-bold truncate" style={{ fontSize: nameSize }}>
+                                                        {selectedList[0].name}
+                                                    </div>
+                                                )}
+                                                {fields.internal_reference && selectedList[0].internal_reference && (
+                                                    <div className="truncate text-gray-600" style={{ fontSize: refSize }}>
+                                                        {selectedList[0].internal_reference}
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
                                         {fields.barcode && (
-                                            <div className="flex-1 flex items-center justify-center min-h-0 mt-[1px]">
-                                                <BarcodeSVG value={selectedList[0].barcode} height={Math.max(18, dims.h * 0.55)} moduleWidth={1.1} showText={dims.h >= 25} />
+                                            <div className="flex-1 flex items-center justify-center min-h-0">
+                                                <BarcodeSVG value={selectedList[0].barcode} height={Math.max(16, dims.h * 0.5)} moduleWidth={1.05} showText={dims.h >= 25} />
                                             </div>
                                         )}
-                                        {(fields.internal_reference || fields.category) && (
+                                        {fields.category && selectedList[0].category_name && (
                                             <div className="text-center leading-none truncate text-gray-600" style={{ fontSize: refSize }}>
-                                                {fields.internal_reference && selectedList[0].internal_reference}
-                                                {fields.internal_reference && fields.category && " · "}
-                                                {fields.category && selectedList[0].category_name}
+                                                {selectedList[0].category_name}
                                             </div>
                                         )}
                                     </div>
@@ -325,45 +332,52 @@ export function LabelGenerator({
 
             {/* ── Zona imprimible: grid de etiquetas ── */}
             <div id="label-print-area">
-                <div style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: "0px",
-                }}>
-                    {selectedList.flatMap(p =>
-                        Array.from({ length: (selected[p.id] || 1) * copiesPerProduct }).map((_, i) => (
-                            <div key={`${p.id}-${i}`} style={{
+                {selectedList.flatMap((p, productIndex) =>
+                    Array.from({ length: (selected[p.id] || 1) * copiesPerProduct }).map((_, copyIndex, arr) => {
+                        const flatIndex = selectedList
+                            .slice(0, productIndex)
+                            .reduce((acc, prev) => acc + (selected[prev.id] || 1) * copiesPerProduct, 0) + copyIndex;
+                        const isLast = flatIndex === totalLabels - 1;
+                        return (
+                            <div key={`${p.id}-${copyIndex}`} className="label-page" style={{
                                 width: `${dims.w}mm`,
                                 height: `${dims.h}mm`,
                                 display: "flex",
                                 flexDirection: "column",
-                                justifyContent: "space-between",
-                                padding: "1.5mm",
+                                padding: "0.8mm",
                                 boxSizing: "border-box",
                                 overflow: "hidden",
                                 breakInside: "avoid",
+                                pageBreakAfter: isLast ? "auto" : "always",
                             }}>
-                                {fields.name && (
-                                    <div style={{ fontSize: `${nameSize}pt`, fontWeight: 700, lineHeight: 1.05, textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                        {p.name}
+                                {(fields.name || fields.internal_reference) && (
+                                    <div style={{ textAlign: "center", lineHeight: 1, minHeight: 0 }}>
+                                        {fields.name && (
+                                            <div style={{ fontSize: `${nameSize}pt`, fontWeight: 700, lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                {p.name}
+                                            </div>
+                                        )}
+                                        {fields.internal_reference && p.internal_reference && (
+                                            <div style={{ fontSize: `${refSize}pt`, color: "#444", lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                                {p.internal_reference}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                                 {fields.barcode && (
-                                    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0, marginTop: "0.5mm" }}>
-                                        <BarcodeSVG value={p.barcode} height={Math.max(20, dims.h * 0.6)} moduleWidth={1.1} showText={dims.h >= 25} />
+                                    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0 }}>
+                                        <BarcodeSVG value={p.barcode} height={Math.max(16, dims.h * 0.5)} moduleWidth={1.05} showText={dims.h >= 25} />
                                     </div>
                                 )}
-                                {(fields.internal_reference || fields.category) && (
+                                {fields.category && p.category_name && (
                                     <div style={{ fontSize: `${refSize}pt`, textAlign: "center", color: "#444", lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                        {fields.internal_reference && p.internal_reference}
-                                        {fields.internal_reference && fields.category && " · "}
-                                        {fields.category && p.category_name}
+                                        {p.category_name}
                                     </div>
                                 )}
                             </div>
-                        ))
-                    )}
-                </div>
+                        );
+                    })
+                )}
             </div>
 
             {/* Estilos: ocultar en pantalla, mostrar SOLO etiquetas al imprimir */}
@@ -378,8 +392,11 @@ export function LabelGenerator({
                                 margin: 0;
                             }
                             html, body {
+                                width: ${dims.w}mm !important;
+                                height: ${dims.h}mm !important;
                                 margin: 0 !important;
                                 padding: 0 !important;
+                                overflow: hidden !important;
                                 visibility: hidden;
                                 background: white !important;
                             }
