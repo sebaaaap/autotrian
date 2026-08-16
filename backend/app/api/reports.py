@@ -142,7 +142,18 @@ def get_sales_summary(
     # 5. Recent Transactions — ordenar por date_created (campo correcto del modelo)
     # Cargar mapa de sucursales para mostrar nombre
     branches_map = {b.id: b.name for b in db.tenant_query(Branch).all()}
-    
+    # Cargar mapa de usuarios: username → nombre completo
+    users_display_map = {
+        u.username: (u.full_name or u.username)
+        for u in db.tenant_query(User).all()
+    }
+
+    def _cajero_name(session):
+        """Devuelve el nombre completo del usuario de la sesión."""
+        if session and session.user_id:
+            return users_display_map.get(session.user_id, session.user_id)
+        return "S/A"
+
     transactions = query.order_by(desc(Ticket.date_created)).limit(10).all()
     trans_list = []
     for t in transactions:
@@ -154,10 +165,8 @@ def get_sales_summary(
         elif len(t.payments) > 1:
             method = "mixto"
         
-        # Cajero desde la sesión
-        cajero = "S/A"
-        if t.session and t.session.user_id:
-            cajero = t.session.user_id
+        # Cajero desde la sesión (nombre completo)
+        cajero = _cajero_name(t.session)
         
         branch_name = branches_map.get(t.branch_id, "Casa Matriz") if t.branch_id else "Casa Matriz"
         
@@ -314,6 +323,12 @@ def get_cash_reports(
         
     sessions_db = q.order_by(desc(CashSession.opened_at)).limit(10).all()
     
+    # Mapa username → nombre completo
+    cash_users_map = {
+        u.username: (u.full_name or u.username)
+        for u in db.tenant_query(User).all()
+    }
+    
     data = []
     total_diff = Decimal('0')
     cash_in_hand = Decimal('0')
@@ -339,7 +354,7 @@ def get_cash_reports(
         caja_name = s.cash_register.name if s.cash_register else "Caja"
         
         data.append({
-            "usuario": s.user_id or "Anónimo",
+            "usuario": cash_users_map.get(s.user_id, s.user_id) if s.user_id else "Anónimo",
             "caja": caja_name,
             "aperturaHora": s.opened_at.strftime("%H:%M") if s.opened_at else "--",
             "aperturaMonto": float(opening),
@@ -551,6 +566,11 @@ def export_sales_excel(
     
     # Precargar sucursales para el Excel
     branches_map = {b.id: b.name for b in db.tenant_query(Branch).all()}
+    # Precargar usuarios: username → nombre completo
+    excel_users_map = {
+        u.username: (u.full_name or u.username)
+        for u in db.tenant_query(User).all()
+    }
     
     # Cargar Gastos del período
     expenses_q = (
@@ -722,7 +742,7 @@ def export_sales_excel(
 
         cajero = "S/A"
         if t.session and t.session.user_id:
-            cajero = t.session.user_id
+            cajero = excel_users_map.get(t.session.user_id, t.session.user_id)
 
         branch_name = branches_map.get(t.branch_id, "Casa Matriz") if t.branch_id else "Casa Matriz"
         row_data = [
@@ -823,7 +843,7 @@ def export_sales_excel(
 
     for i, exp in enumerate(expenses, start=2):
         cat_name = exp_cats.get(str(exp.category_id), "Sin Categoría")
-        cajero_exp = exp.session.user_id if exp.session else "S/A"
+        cajero_exp = excel_users_map.get(exp.session.user_id, exp.session.user_id) if exp.session else "S/A"
         row_data4 = [
             exp.date_created.strftime("%d/%m/%Y %H:%M"),
             cat_name,

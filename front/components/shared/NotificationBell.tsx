@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Bell, Check, Package, User, MapPin, Wallet, Mail, AlertTriangle, LogIn } from "lucide-react";
+import { Bell, Check, Package, User, MapPin, Wallet, Mail, AlertTriangle, LogIn, ShoppingCart } from "lucide-react";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +34,7 @@ function iconFor(notif: Notification) {
     if (a.startsWith("email.")) return Mail;
     if (a.startsWith("user.login")) return LogIn;
     if (a.startsWith("stock.low")) return AlertTriangle;
+    if (a.startsWith("purchase.")) return ShoppingCart;
     return Package;
 }
 

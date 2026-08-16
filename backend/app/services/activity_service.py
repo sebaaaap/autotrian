@@ -35,6 +35,10 @@ class Actions:
     # Cash
     CASH_OPENED = "cash.opened"
     CASH_CLOSED = "cash.closed"
+    # Purchases
+    PURCHASE_CREATED = "purchase.created"
+    PURCHASE_CONFIRMED = "purchase.confirmed"
+    PURCHASE_CANCELLED = "purchase.cancelled"
     # Email
     EMAIL_REPORT_SENT = "email.report_sent"
     # Depuración

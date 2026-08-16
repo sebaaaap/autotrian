@@ -31,6 +31,18 @@ def create_purchase(
         purchase.branch_id = branch_id
         db.commit()
 
+    # ── Activity log ──
+    try:
+        from app.services.activity_service import log_activity, Actions
+        log_activity(db._db, purchase.company_id, current_user,
+                     Actions.PURCHASE_CREATED,
+                     f"Creó compra borrador {purchase.invoice_number or ''} ({len(purchase.items)} ítems)",
+                     entity_type="purchase", entity_id=purchase.id,
+                     metadata={"total": float(purchase.total_cost or 0), "state": "DRAFT"})
+        db._db.commit()
+    except Exception:
+        pass
+
     items_response = [
         PurchaseItemResponse(
             id=item.id,
@@ -294,6 +306,18 @@ def confirm_purchase(
     service = PurchaseService(db)
     purchase = service.confirm_purchase(purchase_id)
 
+    # ── Activity log ──
+    try:
+        from app.services.activity_service import log_activity, Actions
+        log_activity(db._db, purchase.company_id, current_user,
+                     Actions.PURCHASE_CONFIRMED,
+                     f"Aprobó compra {purchase.invoice_number or ''} — stock actualizado",
+                     entity_type="purchase", entity_id=purchase.id,
+                     metadata={"total": float(purchase.total_cost or 0), "items": len(purchase.items)})
+        db._db.commit()
+    except Exception:
+        pass
+
     return PurchaseResponse(
         id=purchase.id,
         date_created=purchase.date_created,
@@ -327,6 +351,19 @@ def cancel_purchase(
     """
     service = PurchaseService(db)
     purchase = service.cancel_purchase(purchase_id)
+
+    # ── Activity log ──
+    try:
+        from app.services.activity_service import log_activity, Actions
+        from app.models.base import ActivityLog
+        log_activity(db._db, purchase.company_id, current_user,
+                     Actions.PURCHASE_CANCELLED,
+                     f"Canceló compra {purchase.invoice_number or ''}",
+                     entity_type="purchase", entity_id=purchase.id,
+                     severity=ActivityLog.Severity.WARNING)
+        db._db.commit()
+    except Exception:
+        pass
 
     return PurchaseResponse(
         id=purchase.id,
@@ -640,6 +677,22 @@ def fast_confirm_scanned_purchase(
 
     # 5. Confirmar inmediatamente la compra para incrementar el stock en inventario
     confirmed_purchase = service.confirm_purchase(purchase.id)
+
+    # ── Activity log: factura escaneada con pistola ──
+    try:
+        from app.services.activity_service import log_activity, Actions
+        log_activity(db._db, confirmed_purchase.company_id, current_user,
+                     Actions.PURCHASE_CONFIRMED,
+                     f"Ingresó factura por pistola: folio {confirmed_purchase.invoice_number or ''} ({len(confirmed_purchase.items)} ítems) — stock actualizado",
+                     entity_type="purchase", entity_id=confirmed_purchase.id,
+                     metadata={
+                         "total": float(confirmed_purchase.total_cost or 0),
+                         "method": "barcode_scan",
+                         "supplier": data.supplier_name,
+                     })
+        db._db.commit()
+    except Exception:
+        pass
 
     return PurchaseResponse(
         id=confirmed_purchase.id,
