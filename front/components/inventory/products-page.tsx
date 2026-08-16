@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Search, Plus, Edit, Trash2, Package, MapPin, ChevronDown, Upload, Loader2, Settings, Coffee, TrendingDown, Scissors } from "lucide-react";
+import { Search, Plus, Edit, Trash2, Package, MapPin, ChevronDown, Upload, Loader2, Settings, Coffee, TrendingDown, Scissors, Tag } from "lucide-react";
 import { ProductModal } from "@/components/shared/product-modal";
 import { SeparateScrapModal } from "./separate-scrap-modal";
+import { LabelGenerator } from "./label-generator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,7 @@ export function ProductsPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isImporting, setIsImporting] = useState(false);
+    const [showLabels, setShowLabels] = useState(false);
 
     const [formData, setFormData] = useState({
         name: "",
@@ -346,6 +348,13 @@ export function ProductsPage() {
                         onChange={handleFileUpload}
                     />
                     <button
+                        onClick={() => setShowLabels(true)}
+                        className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl bg-muted text-foreground hover:bg-muted/80 transition-colors border border-border"
+                    >
+                        <Tag size={16} className="text-primary" />
+                        <span className="hidden md:inline">Etiquetas</span>
+                    </button>
+                    <button
                         onClick={handleImportClick}
                         disabled={isImporting}
                         className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl bg-muted text-foreground hover:bg-muted/80 transition-colors border border-border disabled:opacity-50"
@@ -610,6 +619,16 @@ export function ProductsPage() {
                 onSuccess={() => {
                     fetchProducts();
                 }}
+            />
+            <LabelGenerator
+                open={showLabels}
+                onClose={() => setShowLabels(false)}
+                products={products.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    barcode: p.barcode,
+                    internal_reference: p.internal_reference || null,
+                }))}
             />
         </div>
     );
