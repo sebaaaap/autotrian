@@ -428,6 +428,7 @@ export default function AppPage() {
   const barcodeBuffer = useRef("")
   const barcodeTimeout = useRef<NodeJS.Timeout | null>(null)
   const lastKeyTime = useRef<number>(0)
+  const numpadFedRef = useRef(false)
 
   // Lógica del Teclado Numérico (PdV Core)
   const handleNumpadInput = useCallback(
@@ -508,10 +509,14 @@ export default function AppPage() {
       const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable
 
       if (e.key === "Enter") {
-        if (barcodeBuffer.current.length > 2) {
+        // Escaneo completo: buffer con largo de barcode real (EAN-13, SERV001, etc.)
+        if (barcodeBuffer.current.length >= 6) {
           e.preventDefault()
+          // Si la 1ª tecla del escaneo fue lenta y alimentó el numpad, revertirla
+          if (numpadFedRef.current) handleNumpadInput("CE")
           handleBarcodeSearch(barcodeBuffer.current)
           barcodeBuffer.current = ""
+          numpadFedRef.current = false
         } else if (isInput && target instanceof HTMLInputElement && target.value.length > 0) {
           e.preventDefault()
           handleBarcodeSearch(target.value)
@@ -520,30 +525,33 @@ export default function AppPage() {
       }
 
       const isDigit = e.key >= "0" && e.key <= "9"
-      if (isFast || barcodeBuffer.current.length > 0) {
-        if (e.key.length === 1) {
-          barcodeBuffer.current += e.key
 
-          if (barcodeTimeout.current) clearTimeout(barcodeTimeout.current)
-          barcodeTimeout.current = setTimeout(() => {
-            barcodeBuffer.current = ""
-          }, 500)
+      // Acumular SIEMPRE cada carácter (incluida la PRIMERA tecla — fix dígito perdido)
+      if (!isInput && e.key.length === 1) {
+        barcodeBuffer.current += e.key
 
-          if (isFast) e.preventDefault()
-          return
+        if (barcodeTimeout.current) clearTimeout(barcodeTimeout.current)
+        barcodeTimeout.current = setTimeout(() => {
+          barcodeBuffer.current = ""
+          numpadFedRef.current = false
+        }, 500)
+
+        if (isFast) {
+          // Escáner (teclas rápidas): no propagar
+          e.preventDefault()
+        } else if (selectedLineId && (isDigit || e.key === "." || e.key === ",")) {
+          // Tipeo manual lento con línea seleccionada → numpad al instante.
+          // Si resulta ser el inicio de un escaneo, se revierte con CE en el Enter.
+          numpadFedRef.current = true
+          handleNumpadInput(e.key === "," ? "." : e.key)
         }
+        return
       }
 
       if (isInput) return
 
       if (selectedLineId) {
-        if (isDigit) {
-          e.preventDefault()
-          handleNumpadInput(e.key)
-        } else if (e.key === "." || e.key === ",") {
-          e.preventDefault()
-          handleNumpadInput(".")
-        } else if (e.key === "Backspace") {
+        if (e.key === "Backspace") {
           e.preventDefault()
           handleNumpadInput("CE")
         } else if (e.key === "Escape") {
