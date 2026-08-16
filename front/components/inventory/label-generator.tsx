@@ -14,52 +14,54 @@ import { Printer, X, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 // ── Code 128 encoder (subset B) — SVG puro ────────────────────────────────
-const CODE128_PATTERNS: Record<string, string> = {
-    " ": "212222", "!": "122122", "\"": "122221", "#": "222122", "$": "222221",
-    "%": "212221", "&": "122112", "'": "122211", "(": "122121", ")": "221212",
-    "*": "221221", "+": "222121", ",": "221112", "-": "221211", ".": "221121",
-    "/": "212112", "0": "212211", "1": "212121", "2": "221112", "3": "221211",
-    "4": "221121", "5": "212112", "6": "212211", "7": "212121", "8": "221112",
-    "9": "221211", ":": "221121", ";": "212112", "<": "212211", "=": "212121",
-    ">": "111212", "?": "111221", "@": "121121", "A": "121212", "B": "121221",
-    "C": "121112", "D": "121211", "E": "121121", "F": "122112", "G": "122211",
-    "H": "122121", "I": "112112", "J": "112211", "K": "112121", "L": "211212",
-    "M": "211221", "N": "211112", "O": "211211", "P": "211121", "Q": "212112",
-    "R": "212211", "S": "212121", "T": "112112", "U": "112211", "V": "112121",
-    "W": "122112", "X": "122211", "Y": "122121", "Z": "111122",
+// Tabla estándar oficial Code 128: valor 0..106 → patrón de 6 anchos
+// (valores 0..94 = ASCII 32..126; 95..102 = especiales subset B; 103..106 = start/stop)
+const CODE128_PATTERNS: Record<number, string> = {
+    0: "212222", 1: "222122", 2: "222221", 3: "121223", 4: "121322",
+    5: "131222", 6: "122213", 7: "122312", 8: "132212", 9: "221213",
+    10: "221312", 11: "231212", 12: "112232", 13: "122132", 14: "122231",
+    15: "113222", 16: "123122", 17: "123221", 18: "223211", 19: "221132",
+    20: "221231", 21: "213212", 22: "223112", 23: "312131", 24: "311222",
+    25: "321122", 26: "321221", 27: "312212", 28: "322112", 29: "322211",
+    30: "212123", 31: "212321", 32: "232121", 33: "111323", 34: "131123",
+    35: "131321", 36: "112313", 37: "132113", 38: "132311", 39: "211313",
+    40: "231113", 41: "231311", 42: "112133", 43: "112331", 44: "132131",
+    45: "113123", 46: "113321", 47: "133121", 48: "313121", 49: "211331",
+    50: "231131", 51: "213113", 52: "213311", 53: "213131", 54: "311123",
+    55: "311321", 56: "331121", 57: "312113", 58: "312311", 59: "332111",
+    60: "314111", 61: "221411", 62: "431111", 63: "111224", 64: "111422",
+    65: "121124", 66: "121421", 67: "141122", 68: "141221", 69: "112214",
+    70: "112412", 71: "122114", 72: "122411", 73: "142112", 74: "142211",
+    75: "241211", 76: "221114", 77: "413111", 78: "241112", 79: "134111",
+    80: "111242", 81: "121142", 82: "121241", 83: "114212", 84: "124112",
+    85: "124211", 86: "411212", 87: "421112", 88: "421211", 89: "212141",
+    90: "214121", 91: "412121", 92: "111143", 93: "111341", 94: "131141",
+    95: "114113", 96: "114311", 97: "411113", 98: "411311", 99: "113141",
+    100: "114131", 101: "311141", 102: "411131",
+    103: "211412",  // Start A
+    104: "211214",  // Start B
+    105: "211232",  // Start C
+    106: "2331112", // Stop (7 elementos)
 };
-const START_B = "211214";   // Start B
-const STOP = "2331112";     // Stop
+const START_B = 104;
+const STOP = 106;
 
 function encodeCode128(text: string): number[] {
     // Devuelve secuencia de anchos [bar, space, bar, space...] en módulos
-    const keys = Object.keys(CODE128_PATTERNS);
     const seq: number[] = [];
-    const push = (pattern: string) => {
-        for (const ch of pattern) seq.push(parseInt(ch));
+    const push = (value: number) => {
+        for (const ch of CODE128_PATTERNS[value]) seq.push(parseInt(ch));
     };
     push(START_B);
     // Checksum: (Start B value 104 + Σ char_value × position) % 103
-    // char_value en Code128 subset B = ASCII - 32
-    let checksum = 104;
+    let checksum = START_B;
     const chars = text.split("");
     chars.forEach((c, i) => {
-        push(CODE128_PATTERNS[c] || CODE128_PATTERNS["?"]);
-        checksum += (c.charCodeAt(0) - 32) * (i + 1);
+        const v = c.charCodeAt(0) - 32;
+        push(v);
+        checksum += v * (i + 1);
     });
-    checksum = checksum % 103;
-    // Mapear checksum a patrón: valores 0..94 = ASCII 32..126 (' ' a '~')
-    if (checksum <= 94) {
-        const ch = String.fromCharCode(32 + checksum);
-        push(CODE128_PATTERNS[ch] || CODE128_PATTERNS["?"]);
-    } else {
-        // valores 95..102 — patrones especiales de la tabla Code B
-        const special: Record<number, string> = {
-            95: "222121", 96: "222112", 97: "222211", 98: "121221",
-            99: "121112", 100: "121211", 101: "212121", 102: "212121",
-        };
-        push(special[checksum]);
-    }
+    push(checksum % 103);
     push(STOP);
     return seq;
 }
@@ -148,7 +150,7 @@ export function LabelGenerator({
 }) {
     const [selected, setSelected] = useState<Record<string, number>>({});
     const [fields, setFields] = useState<LabelFields>({
-        name: false, barcode: true, internal_reference: false, category: false,
+        name: true, barcode: true, internal_reference: true, category: false,
     });
     const [preset, setPreset] = useState("80x45");
     const [customW, setCustomW] = useState(50);
