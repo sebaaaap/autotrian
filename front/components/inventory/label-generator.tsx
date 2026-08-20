@@ -286,8 +286,10 @@ export function LabelGenerator({
     const pxW = dims.w * 3.78;
     const pxH = dims.h * 3.78;
 
-    const nameSize = dims.h >= 30 ? 8 : 6.5;
-    const refSize = dims.h >= 30 ? 6.5 : 5.5;
+    // 80×45 (papel del cliente): texto grande — nombre 12pt, ref/categoría 9pt
+    const bigText = dims.w >= 80 && dims.h >= 45;
+    const nameSize = bigText ? 12 : dims.h >= 30 ? 8 : 6.5;
+    const refSize = bigText ? 9 : dims.h >= 30 ? 6.5 : 5.5;
     // Altura de barras: barcode-only ocupa casi toda la etiqueta
     const barcodeOnly = !fields.name && !fields.internal_reference && !fields.category;
     const barcodeH = barcodeOnly ? Math.max(50, dims.h * 2.4) : Math.max(35, dims.h * 1.4);
@@ -442,12 +444,12 @@ export function LabelGenerator({
                                         {(fields.name || fields.internal_reference) && (
                                             <div className="text-center leading-none min-h-0">
                                                 {fields.name && (
-                                                    <div className="font-bold truncate" style={{ fontSize: nameSize }}>
+                                                    <div className="font-bold truncate" style={{ fontSize: `${nameSize}pt` }}>
                                                         {selectedList[0].name}
                                                     </div>
                                                 )}
                                                 {fields.internal_reference && selectedList[0].internal_reference && (
-                                                    <div className="truncate text-gray-600" style={{ fontSize: refSize }}>
+                                                    <div className="truncate text-gray-600" style={{ fontSize: `${refSize}pt` }}>
                                                         {selectedList[0].internal_reference}
                                                     </div>
                                                 )}
@@ -459,7 +461,7 @@ export function LabelGenerator({
                                             </div>
                                         )}
                                         {fields.category && selectedList[0].category_name && (
-                                            <div className="text-center leading-none truncate text-gray-600" style={{ fontSize: refSize }}>
+                                            <div className="text-center leading-none truncate text-gray-600" style={{ fontSize: `${refSize}pt` }}>
                                                 {selectedList[0].category_name}
                                             </div>
                                         )}
