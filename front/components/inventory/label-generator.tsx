@@ -6,10 +6,12 @@
  * - Campos configurables: nombre, barcode, referencia interna, categoría
  * - Tamaño de etiqueta configurable (presets térmicos + personalizado)
  * - Código de barras Code 128 dibujado en SVG puro (sin librerías)
- * - Imprime directo desde el navegador (Ctrl+P → impresora térmica)
+ * - Impresión vía IFRAME aislado (about:srcdoc): sin URL, sin título y con
+ *   @page margin:0 → Chrome NO puede imprimir hora/ruta/nombre del sistema
+ *   en la etiqueta. Solo salen los campos seleccionados.
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Printer, X, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -140,6 +142,102 @@ const LABEL_PRESETS = [
     { id: "custom", label: "Personalizado", w: 0, h: 0 },
 ];
 
+// ── Impresión: HTML independiente dentro de un iframe aislado ──────────────
+// El documento del iframe vive en about:srcdoc → sin URL, sin título de pestaña,
+// y con @page margin:0 Chrome no tiene dónde dibujar encabezado/pie (hora, ruta,
+// nombre del sistema). En la etiqueta SOLO salen los campos seleccionados.
+
+const escapeHtml = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+function barcodeSvgString(value: string, height: number, moduleWidth: number, showText: boolean): string {
+    const seq = encodeCode128(value);
+    const bars: string[] = [];
+    let x = 0;
+    for (let i = 0; i < seq.length; i += 2) {
+        const barW = seq[i] * moduleWidth;
+        const spaceW = (seq[i + 1] || 0) * moduleWidth;
+        bars.push(`<rect x="${x}" y="0" width="${barW}" height="${height}" fill="black"/>`);
+        x += barW + spaceW;
+    }
+    const totalW = x;
+    const textH = showText ? 12 : 0;
+    const quiet = 10 * moduleWidth;
+    const text = showText
+        ? `<text x="${totalW / 2}" y="${height + textH - 2}" text-anchor="middle" font-size="${textH - 3}" font-family="monospace" fill="black">${escapeHtml(value)}</text>`
+        : "";
+    return (
+        `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" ` +
+        `viewBox="${-quiet} 0 ${totalW + quiet * 2} ${height + textH}" ` +
+        `preserveAspectRatio="xMidYMid meet" style="display:block">` +
+        `<rect x="${-quiet}" y="0" width="${totalW + quiet * 2}" height="${height + textH}" fill="white"/>` +
+        bars.join("") + text + `</svg>`
+    );
+}
+
+function buildPrintHtml(opts: {
+    labels: LabelProduct[];
+    fields: LabelFields;
+    dims: { w: number; h: number };
+    nameSize: number;
+    refSize: number;
+    barcodeH: number;
+}): string {
+    const { labels, fields, dims, nameSize, refSize, barcodeH } = opts;
+    const showText = dims.h >= 25;
+
+    const pages = labels.map(p => {
+        const header = (fields.name || fields.internal_reference)
+            ? `<div class="hdr">` +
+              (fields.name ? `<div class="t-name" style="font-size:${nameSize}pt">${escapeHtml(p.name)}</div>` : "") +
+              (fields.internal_reference && p.internal_reference
+                  ? `<div class="t-ref" style="font-size:${refSize}pt">${escapeHtml(p.internal_reference)}</div>`
+                  : "") +
+              `</div>`
+            : "";
+        const barcode = fields.barcode
+            ? `<div class="bc-wrap">${barcodeSvgString(p.barcode, barcodeH, 1.05, showText)}</div>`
+            : "";
+        const category = fields.category && p.category_name
+            ? `<div class="t-cat" style="font-size:${refSize}pt">${escapeHtml(p.category_name)}</div>`
+            : "";
+        return `<div class="label-page">${header}${barcode}${category}</div>`;
+    }).join("");
+
+    return `<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title> </title>
+<style>
+    @page { size: ${dims.w}mm ${dims.h}mm; margin: 0; }
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    html, body { background: #fff; }
+    body { font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+    .label-page {
+        width: ${dims.w}mm;
+        height: ${dims.h}mm;
+        display: flex;
+        flex-direction: column;
+        gap: 0.3mm;
+        padding: 0.8mm;
+        overflow: hidden;
+        break-inside: avoid;
+        page-break-after: always;
+    }
+    .label-page:last-child { page-break-after: auto; }
+    .hdr { text-align: center; line-height: 1; min-height: 0; }
+    .t-name { font-weight: 700; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .t-ref { color: #444; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .t-cat { color: #444; text-align: center; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bc-wrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+    .bc-wrap svg { width: 100%; height: 100%; }
+</style>
+</head>
+<body>${pages}</body>
+</html>`;
+}
+
 export function LabelGenerator({
     open,
     onClose,
@@ -157,6 +255,7 @@ export function LabelGenerator({
     const [customW, setCustomW] = useState(50);
     const [customH, setCustomH] = useState(25);
     const [copiesPerProduct, setCopiesPerProduct] = useState(1);
+    const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
     if (!open) return null;
 
@@ -183,11 +282,7 @@ export function LabelGenerator({
         setSelected(all);
     };
 
-    const print = () => {
-        window.print();
-    };
-
-    // mm → px para @media print (96dpi ≈ 3.78px/mm)
+    // mm → px para el preview (96dpi ≈ 3.78px/mm)
     const pxW = dims.w * 3.78;
     const pxH = dims.h * 3.78;
 
@@ -197,9 +292,54 @@ export function LabelGenerator({
     const barcodeOnly = !fields.name && !fields.internal_reference && !fields.category;
     const barcodeH = barcodeOnly ? Math.max(50, dims.h * 2.4) : Math.max(35, dims.h * 1.4);
 
+    const print = () => {
+        // Lista plana: cada etiqueta = una página exacta del tamaño elegido
+        const labels: LabelProduct[] = [];
+        selectedList.forEach(p => {
+            const n = (selected[p.id] || 1) * copiesPerProduct;
+            for (let i = 0; i < n; i++) labels.push(p);
+        });
+        if (labels.length === 0) return;
+
+        const html = buildPrintHtml({ labels, fields, dims, nameSize, refSize, barcodeH });
+
+        // Iframe oculto fuera de pantalla: documento aislado (about:srcdoc)
+        let iframe = iframeRef.current;
+        if (!iframe || !document.body.contains(iframe)) {
+            iframe = document.createElement("iframe");
+            iframe.setAttribute("aria-hidden", "true");
+            iframe.style.cssText =
+                `position:fixed;left:-10000px;top:0;width:${Math.round(pxW)}px;height:${Math.round(pxH)}px;border:0;`;
+            iframeRef.current = iframe;
+        }
+        const el = iframe;
+        const cleanup = () => setTimeout(() => {
+            if (el.parentNode) el.parentNode.removeChild(el);
+            if (iframeRef.current === el) iframeRef.current = null;
+        }, 500);
+
+        el.addEventListener("load", () => {
+            setTimeout(() => {
+                try {
+                    const win = el.contentWindow;
+                    if (!win) return;
+                    win.addEventListener("afterprint", cleanup);
+                    win.focus();
+                    win.print();
+                    setTimeout(cleanup, 30000); // red de seguridad si afterprint no dispara
+                } catch {
+                    cleanup();
+                }
+            }, 100);
+        }, { once: true });
+
+        document.body.appendChild(el);
+        el.srcdoc = html;
+    };
+
     return (
         <>
-            {/* ── Panel de configuración (no se imprime) ── */}
+            {/* ── Panel de configuración (pantalla) ── */}
             <div id="label-config-panel" className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
                 <div className="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
                     <div className="flex items-center justify-between p-5 border-b border-border bg-muted/30">
@@ -338,95 +478,6 @@ export function LabelGenerator({
                     </div>
                 </div>
             </div>
-
-            {/* ── Zona imprimible: grid de etiquetas ── */}
-            <div id="label-print-area">
-                {selectedList.flatMap((p, productIndex) =>
-                    Array.from({ length: (selected[p.id] || 1) * copiesPerProduct }).map((_, copyIndex, arr) => {
-                        const flatIndex = selectedList
-                            .slice(0, productIndex)
-                            .reduce((acc, prev) => acc + (selected[prev.id] || 1) * copiesPerProduct, 0) + copyIndex;
-                        const isLast = flatIndex === totalLabels - 1;
-                        return (
-                            <div key={`${p.id}-${copyIndex}`} className="label-page" style={{
-                                width: `${dims.w}mm`,
-                                height: `${dims.h}mm`,
-                                display: "flex",
-                                flexDirection: "column",
-                                padding: "0.8mm",
-                                boxSizing: "border-box",
-                                overflow: "hidden",
-                                breakInside: "avoid",
-                                pageBreakAfter: isLast ? "auto" : "always",
-                            }}>
-                                {(fields.name || fields.internal_reference) && (
-                                    <div style={{ textAlign: "center", lineHeight: 1, minHeight: 0 }}>
-                                        {fields.name && (
-                                            <div style={{ fontSize: `${nameSize}pt`, fontWeight: 700, lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                                {p.name}
-                                            </div>
-                                        )}
-                                        {fields.internal_reference && p.internal_reference && (
-                                            <div style={{ fontSize: `${refSize}pt`, color: "#444", lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                                {p.internal_reference}
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                                {fields.barcode && (
-                                    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 0 }}>
-                                        <BarcodeSVG value={p.barcode} height={barcodeH} moduleWidth={1.05} showText={dims.h >= 25} />
-                                    </div>
-                                )}
-                                {fields.category && p.category_name && (
-                                    <div style={{ fontSize: `${refSize}pt`, textAlign: "center", color: "#444", lineHeight: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                                        {p.category_name}
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })
-                )}
-            </div>
-
-            {/* Estilos: ocultar en pantalla, mostrar SOLO etiquetas al imprimir */}
-            <style
-                dangerouslySetInnerHTML={{
-                    __html: `
-                        #label-print-area { display: none; }
-
-                        @media print {
-                            @page {
-                                size: ${dims.w}mm ${dims.h}mm;
-                                margin: 0;
-                            }
-                            html, body {
-                                width: ${dims.w}mm !important;
-                                height: ${dims.h}mm !important;
-                                margin: 0 !important;
-                                padding: 0 !important;
-                                overflow: hidden !important;
-                                visibility: hidden;
-                                background: white !important;
-                            }
-                            #label-config-panel {
-                                display: none !important;
-                            }
-                            #label-print-area {
-                                display: block !important;
-                                visibility: visible;
-                                position: absolute;
-                                left: 0;
-                                top: 0;
-                                width: 100%;
-                            }
-                            #label-print-area * {
-                                visibility: visible;
-                            }
-                        }
-                    `,
-                }}
-            />
         </>
     );
 }

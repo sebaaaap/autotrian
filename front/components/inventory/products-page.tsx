@@ -628,6 +628,7 @@ export function ProductsPage() {
                     name: p.name,
                     barcode: p.barcode,
                     internal_reference: p.internal_reference || null,
+                    category_name: categories.find(c => c.id === p.category_id)?.name || null,
                 }))}
             />
         </div>
