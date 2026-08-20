@@ -72,11 +72,12 @@ def get_available_locations(
     # Obtener todas las ubicaciones candidatas
     all_locs = query.all()
     
-    # Obtener ocupación actual
+    # Obtener ocupación actual.
+    # La ocupación la define la ASIGNACIÓN (location_id), NO el stock:
+    # un producto asignado con stock 0 igualmente reserva su casillero único.
     occupancy_query = db.tenant_query(Product.location_id).filter(
         Product.location_id != None,
-        Product.is_active == True,
-        Product.stock_quantity > 0
+        Product.is_active == True
     )
     if branch_id:
         occupancy_query = occupancy_query.filter(Product.branch_id == branch_id)
@@ -102,7 +103,9 @@ def get_products_in_location(
     branch_id: Optional[UUID] = Header(None, alias="X-Branch-ID")
 ):
     """
-    Devuelve los productos asignados a una ubicación específica o sus sub-ubicaciones
+    Devuelve los productos asignados a una ubicación específica o sus sub-ubicaciones.
+    Incluye productos asignados con stock 0: la ASIGNACIÓN (location_id) es la que
+    hace visible el producto en el panel, aunque aún no tenga existencias.
     """
     target_loc = db.tenant_query(StorageLocation).filter(StorageLocation.id == location_id).first()
     if not target_loc:
@@ -117,8 +120,7 @@ def get_products_in_location(
 
     query = db.tenant_query(Product).filter(
         Product.location_id.in_(loc_ids),
-        Product.is_active == True,
-        Product.stock_quantity > 0
+        Product.is_active == True
     )
     if branch_id:
         query = query.filter((Product.branch_id == branch_id) | (Product.branch_id.is_(None)))

@@ -269,6 +269,122 @@ def test_cambio_ubicacion_interna(db, admin_token, client, ubicaciones, producto
 
 
 
+# ─── Test 6: Asignación visible con stock 0 ───────────────────────────────────
+#
+# CONTEXTO REAL (bug reportado 2026-08-20):
+#   Al crear un producto con ubicación asignada, el sistema decía "guardado"
+#   pero el panel de Ubicaciones no mostraba el producto. Causa raíz: el modal
+#   de producto no maneja stock (nace en 0) y las consultas filtraban
+#   stock_quantity > 0. La ASIGNACIÓN (location_id) es lo que hace visible
+#   y ocupa una ubicación, NO el stock.
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _crear_producto(client, admin_token, *, name, barcode, location_id):
+    """Helper: crea un producto vía API igual que el modal del frontend (sin stock)."""
+    payload = {
+        "name": name,
+        "barcode": barcode,
+        "price": 5000,
+        "cost": 2500,
+        "product_type": "STORABLE",
+        "location_id": str(location_id),
+    }
+    return client.post(
+        "/api/v1/products/",
+        json=payload,
+        headers={"Authorization": admin_token},
+    )
+
+
+def test_producto_asignado_con_stock_0_aparece_en_panel_ubicaciones(
+    client, db, admin_token, ubicaciones
+):
+    """
+    ESCENARIO: Se crea un producto con ubicación y stock 0 (flujo del modal).
+    ESPERADO:
+      - El create responde 200 y guarda location_id.
+      - GET /locations/{id}/products INCLUYE el producto (la asignación manda).
+    """
+    loc = ubicaciones["multi"]
+
+    resp = _crear_producto(
+        client, admin_token,
+        name="Bujía NGK Stock Cero", barcode="NGK-000-STOCK0",
+        location_id=loc.id,
+    )
+    assert resp.status_code == 200, f"Esperado 200, obtenido {resp.status_code}: {resp.text}"
+    assert resp.json()["location_id"] == str(loc.id)
+
+    panel = client.get(
+        f"/api/v1/locations/{loc.id}/products",
+        headers={"Authorization": admin_token},
+    )
+    assert panel.status_code == 200, panel.text
+    names = [p["name"] for p in panel.json()]
+    assert "Bujía NGK Stock Cero" in names, (
+        f"FALLO: producto asignado con stock 0 es invisible en el panel de "
+        f"ubicaciones. El panel devolvió: {names}"
+    )
+
+
+def test_listado_productos_muestra_ubicacion_asignada_con_stock_0(
+    client, db, admin_token, ubicaciones
+):
+    """
+    ESCENARIO: Producto con stock 0 asignado a una ubicación.
+    ESPERADO: GET /products/ devuelve el producto agregado con su
+    lista `locations` poblada (columna Ubicación del catálogo).
+    """
+    loc = ubicaciones["multi"]
+
+    resp = _crear_producto(
+        client, admin_token,
+        name="Filtro Registro Stock Cero", barcode="FLT-000-STOCK0",
+        location_id=loc.id,
+    )
+    assert resp.status_code == 200, resp.text
+
+    listing = client.get("/api/v1/products/", headers={"Authorization": admin_token})
+    assert listing.status_code == 200, listing.text
+
+    entry = next(
+        (p for p in listing.json() if p["barcode"] == "FLT-000-STOCK0"), None
+    )
+    assert entry is not None, "El producto creado no aparece en el listado"
+    assert entry.get("locations"), (
+        f"FALLO: location_id asignado pero `locations` vacío en el listado "
+        f"(asignación invisible). Entrada: {entry}"
+    )
+
+
+def test_ubicacion_unica_queda_reservada_por_producto_con_stock_0(
+    client, db, admin_token, ubicaciones
+):
+    """
+    ESCENARIO: Casillero estricto (SKU único) con un producto asignado en stock 0.
+    ESPERADO: Un segundo SKU DISTINTO debe ser rechazado con 400 — el producto
+    con stock 0 igualmente RESERVA su casillero único.
+    """
+    loc = ubicaciones["unico"]
+
+    resp_a = _crear_producto(
+        client, admin_token,
+        name="Batería 12V Reservada", barcode="BAT-RESV-01",
+        location_id=loc.id,
+    )
+    assert resp_a.status_code == 200, resp_a.text
+
+    resp_b = _crear_producto(
+        client, admin_token,
+        name="Aceite Intruso", barcode="OIL-INTR-02",
+        location_id=loc.id,
+    )
+    assert resp_b.status_code == 400, (
+        f"FALLO: la ubicación única no quedó reservada por el producto con "
+        f"stock 0 y se aceptó un segundo SKU ({resp_b.status_code}): {resp_b.text[:200]}"
+    )
+
+
 # ─── Test 5: Venta que supera el stock disponible ─────────────────────────────
 #
 # CONTEXTO REAL DE TALLER:

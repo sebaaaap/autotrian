@@ -309,8 +309,7 @@ def create_product(
             occupant = db.tenant_query(Product).filter(
                 Product.location_id == product.location_id,
                 Product.barcode != product.barcode,
-                Product.is_active == True,
-                Product.stock_quantity > 0
+                Product.is_active == True
             ).first()
             if occupant:
                 raise HTTPException(
@@ -472,7 +471,9 @@ def list_products(
         
         locs = []
         for i in items:
-            if i.location and i.stock_quantity > 0:
+            # La asignación visible incluye stock 0: un producto asignado a una
+            # ubicación debe mostrarse ahí aunque aún no tenga existencias.
+            if i.location:
                 locs.append(ProductLocationDetail(
                     id=i.id,
                     location_id=i.location.id,
@@ -614,8 +615,7 @@ def update_product(
                      occupant = db.tenant_query(Product).filter(
                          Product.location_id == loc.id,
                          Product.barcode != db_product.barcode,
-                         Product.is_active == True,
-                         Product.stock_quantity > 0
+                         Product.is_active == True
                      ).first()
                      
                      if occupant:

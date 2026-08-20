@@ -158,12 +158,14 @@ def purge_preview(
             if r in reasons_count:
                 reasons_count[r] += 1
 
-    # Ubicaciones huérfanas (sin productos activos con stock)
+    # Ubicaciones huérfanas (sin NINGÚN producto activo asignado).
+    # La asignación (location_id) es lo que ocupa una ubicación, no el stock:
+    # una ubicación con un SKU asignado en stock 0 NO es huérfana.
     orphan_locations = []
     locs = db.tenant_query(StorageLocation).all()
     occupied_loc_ids = {
         p.location_id for p in products
-        if p.location_id and float(p.stock_quantity or 0) > 0
+        if p.location_id
     }
     for loc in locs:
         if loc.name == "Pasillo Mermas":
