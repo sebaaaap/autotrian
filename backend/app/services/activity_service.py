@@ -39,6 +39,12 @@ class Actions:
     PURCHASE_CREATED = "purchase.created"
     PURCHASE_CONFIRMED = "purchase.confirmed"
     PURCHASE_CANCELLED = "purchase.cancelled"
+    PURCHASE_DELETED = "purchase.deleted"
+    PURCHASE_UPDATED = "purchase.updated"
+    # Suppliers
+    SUPPLIER_CREATED = "supplier.created"
+    SUPPLIER_UPDATED = "supplier.updated"
+    SUPPLIER_DELETED = "supplier.deleted"
     # Email
     EMAIL_REPORT_SENT = "email.report_sent"
     # Depuración

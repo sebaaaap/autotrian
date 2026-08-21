@@ -1,7 +1,7 @@
 from uuid import UUID
 from datetime import datetime
 from decimal import Decimal
-from fastapi import APIRouter, Depends, Query, UploadFile, File, Header
+from fastapi import APIRouter, Depends, Query, UploadFile, File, Header, HTTPException
 
 from app.api.deps import get_tenant_session
 from app.db.tenant_session import TenantSession
@@ -400,6 +400,18 @@ def update_purchase(
     service = PurchaseService(db)
     purchase = service.update_purchase(purchase_id, data)
 
+    # ── Activity log ──
+    try:
+        from app.services.activity_service import log_activity, Actions
+        log_activity(db._db, purchase.company_id, current_user,
+                     Actions.PURCHASE_UPDATED,
+                     f"Editó compra borrador {purchase.invoice_number or purchase.id}",
+                     entity_type="purchase", entity_id=purchase.id,
+                     metadata={"invoice_number": purchase.invoice_number, "notes": purchase.notes})
+        db._db.commit()
+    except Exception:
+        pass
+
     return PurchaseResponse(
         id=purchase.id,
         date_created=purchase.date_created,
@@ -421,6 +433,61 @@ def update_purchase(
             for item in purchase.items
         ]
     )
+
+@router.delete("/{purchase_id}")
+def delete_purchase(
+    purchase_id: UUID,
+    db: TenantSession = Depends(get_tenant_session),
+    current_user = Depends(check_roles(["admin"])),
+    branch_id: Optional[UUID] = Header(None, alias="X-Branch-ID")
+):
+    """
+    Elimina una compra de cualquier estado (borrador, confirmada o cancelada).
+    - Borrador/Cancelada: borrado físico directo.
+    - Confirmada: revierte el stock que ingresó (movimiento OUT_ADJUSTMENT
+      trazable) y luego borra.
+    Registra la acción en el audit log con el usuario responsable.
+    """
+    from app.models.base import Purchase, PurchaseState
+
+    # Validar scope de sucursal: la compra debe pertenecer a la sucursal activa
+    q = db.tenant_query(Purchase).filter(Purchase.id == purchase_id)
+    if branch_id:
+        q = q.filter(Purchase.branch_id == branch_id)
+    purchase = q.first()
+    if not purchase:
+        raise HTTPException(status_code=404, detail="Compra no encontrada en esta sucursal")
+
+    service = PurchaseService(db)
+    summary = service.delete_purchase(purchase_id)
+
+    # ── Activity log ──
+    try:
+        from app.services.activity_service import log_activity, Actions
+        from app.models.base import ActivityLog
+        state = summary.get("state", "?")
+        desc = f"Eliminó compra {purchase.invoice_number or purchase.id} ({state})"
+        if summary.get("stock_reverted"):
+            desc += f" — stock revertido: {summary['stock_reverted']} u."
+        log_activity(db._db, purchase.company_id, current_user,
+                     Actions.PURCHASE_DELETED, desc,
+                     entity_type="purchase", entity_id=purchase.id,
+                     severity=ActivityLog.Severity.WARNING,
+                     metadata={
+                         "state": state,
+                         "total": float(purchase.total_cost or 0),
+                         "stock_reverted": summary.get("stock_reverted", 0),
+                         "items": summary.get("items", []),
+                     })
+        db._db.commit()
+    except Exception:
+        pass
+
+    return {
+        "status": "ok",
+        "detail": f"Compra {purchase.invoice_number or purchase.id} eliminada"
+                  + (f". Se revirtió {summary.get('stock_reverted', 0)} unidades de stock." if summary.get("stock_reverted") else "."),
+    }
 
 
 # ── SINGLE-SCAN INVOICE INTAKE (PISTOLA LECTORA) ──────────────────────────────

@@ -389,6 +389,7 @@ class Supplier(TenantModel):
     address = Column(String, nullable=True)
     phone = Column(String, nullable=True)
     email = Column(String, nullable=True)
+    notes = Column(String, nullable=True)
     
     purchases = relationship("Purchase", back_populates="supplier")
     products_info = relationship("ProductSupplier", back_populates="supplier", cascade="all, delete-orphan")

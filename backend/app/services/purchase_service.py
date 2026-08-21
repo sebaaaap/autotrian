@@ -274,3 +274,89 @@ class PurchaseService:
         except Exception as e:
             self.db.rollback()
             raise HTTPException(status_code=500, detail=f"Error al actualizar la compra: {str(e)}")
+
+    def delete_purchase(self, purchase_id) -> dict:
+        """
+        Elimina una compra de cualquier estado:
+        - DRAFT / CANCELLED: borrado físico directo (nunca tocó stock).
+        - CONFIRMED: revierte el stock ingresado por cada ítem (movimiento
+          OUT_ADJUSTMENT con stock_before/after por trazabilidad), respeta
+          el piso 0, y luego borra físicamente la compra y sus ítems.
+
+        Retorna un resumen {state, stock_reverted, items} para el audit log.
+        """
+        purchase = self.db.tenant_query(Purchase).filter(Purchase.id == purchase_id).first()
+        if not purchase:
+            raise HTTPException(status_code=404, detail="Compra no encontrada")
+
+        state = purchase.state
+        stock_reverted = 0.0
+        items_summary = []
+
+        try:
+            if state == PurchaseState.CONFIRMED:
+                branch_id = purchase.branch_id
+
+                movement = InventoryMovement(
+                    type=MovementType.OUT_ADJUSTMENT,
+                    reason=f"Eliminación compra #{purchase.id}" + (f" - Factura: {purchase.invoice_number}" if purchase.invoice_number else "")
+                )
+                self.db.add(movement)
+                self.db.flush()
+
+                from app.models.base import StorageLocation
+                merma_loc_q = self.db.tenant_query(StorageLocation).filter(
+                    StorageLocation.name == "Pasillo Mermas"
+                )
+                if branch_id:
+                    merma_loc_q = merma_loc_q.filter(StorageLocation.branch_id == branch_id)
+                merma_loc = merma_loc_q.first()
+                merma_loc_id = merma_loc.id if merma_loc else None
+
+                for item in purchase.items:
+                    product = self.db.tenant_query(Product).filter(Product.id == item.product_id).first()
+                    if not product or not product.is_active:
+                        items_summary.append({"producto": str(item.product_id), "qty": float(item.quantity), "revertido": 0})
+                        continue
+
+                    target = product
+                    # Misma lógica que confirm: si la instancia está en Mermas,
+                    # descontar de una instancia vendible del mismo SKU
+                    if merma_loc_id and product.location_id == merma_loc_id:
+                        alt_q = self.db.tenant_query(Product).filter(
+                            Product.barcode == product.barcode,
+                            Product.location_id != merma_loc_id,
+                            Product.is_active == True
+                        )
+                        if branch_id:
+                            alt_q = alt_q.filter(Product.branch_id == branch_id)
+                        target = alt_q.first() or product
+
+                    stock_before = float(target.stock_quantity or 0)
+                    reverted = min(float(item.quantity), stock_before)  # piso 0: no dejar stock negativo
+                    target.stock_quantity = stock_before - reverted
+                    stock_reverted += reverted
+                    items_summary.append({"producto": target.name, "qty": reverted, "revertido": 1})
+
+                    self.db.add(InventoryMovementItem(
+                        movement_id=movement.id,
+                        product_id=target.id,
+                        quantity=reverted,
+                        stock_before=stock_before,
+                        stock_after=float(target.stock_quantity)
+                    ))
+
+            # Borrado físico: ítems + compra (vía ORM para que el unit-of-work
+            # quede consistente y no choque con la nullificación de FKs)
+            for item in list(purchase.items):
+                self.db.delete(item)
+            self.db.delete(purchase)
+            self.db.commit()
+            return {
+                "state": state.name,
+                "stock_reverted": stock_reverted,
+                "items": items_summary,
+            }
+        except Exception as e:
+            self.db.rollback()
+            raise HTTPException(status_code=500, detail=f"Error al eliminar la compra: {str(e)}")

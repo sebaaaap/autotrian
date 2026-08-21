@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Plus, ShoppingCart, X, FileSpreadsheet, CheckCircle2, XCircle, FileEdit, AlertTriangle, Scan } from "lucide-react";
+import { Plus, ShoppingCart, X, FileSpreadsheet, CheckCircle2, XCircle, FileEdit, AlertTriangle, Scan, Trash2 } from "lucide-react";
 import api from "@/lib/api";
 import { SIIImportModal } from "@/components/compras/sii-import-modal";
 import { InvoiceScannerModal } from "@/components/compras/invoice-scanner-modal";
@@ -178,6 +178,25 @@ export function PurchasesList() {
             setSelectedPurchase(null);
         } catch (error: any) {
             alert("Error: " + (error.response?.data?.detail || "Error al cancelar"));
+        }
+    };
+
+    const deletePurchase = async (p: Purchase) => {
+        const msg = p.state === "CONFIRMED"
+            ? `¿ELIMINAR definitivamente la compra ${p.invoice_number || p.id.slice(0, 8)}?\n\nEstá CONFIRMADA: el stock que ingresó será REVERTIDO del inventario.\nEsta acción queda registrada en el log de auditoría.`
+            : `¿ELIMINAR definitivamente la compra ${p.invoice_number || p.id.slice(0, 8)}?\n\nEsta acción queda registrada en el log de auditoría.`;
+        if (!confirm(msg)) return;
+        setIsProcessing(true);
+        try {
+            const res = await api.delete(`/purchases/${p.id}`);
+            alert(res.data?.detail || "Compra eliminada");
+            setSelectedPurchase(null);
+            await fetchPurchases();
+            await fetchProducts();
+        } catch (error: any) {
+            alert("Error: " + (error.response?.data?.detail || "Error al eliminar"));
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -820,7 +839,16 @@ export function PurchasesList() {
                                 <div className="w-2 h-2 rounded-full bg-muted-foreground/30" />
                                 Auditoría: Sistema de Control
                             </div>
-                            <div className="flex gap-3">
+                            <div className="flex gap-3 items-center">
+                                <button
+                                    onClick={() => deletePurchase(selectedPurchase)}
+                                    disabled={isProcessing}
+                                    className="px-4 py-2.5 text-xs font-bold uppercase rounded-xl border border-destructive/30 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                                    title="Eliminar definitivamente (revierte stock si está confirmada)"
+                                >
+                                    <Trash2 size={14} />
+                                    Eliminar Orden
+                                </button>
                                 {selectedPurchase.state === "DRAFT" && (
                                     <>
                                         <button
