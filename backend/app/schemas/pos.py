@@ -89,7 +89,9 @@ class SaleItemCreate(BaseModel):
 
 class SaleItemResponse(BaseModel):
     id: UUID
-    product_id: UUID
+    product_id: Optional[UUID] = None
+    virtual_name: Optional[str] = None
+    is_virtual: bool = False
     quantity: Decimal
     unit_price: Decimal
     discount_percent: Decimal

@@ -13,9 +13,10 @@ class WorkOrderItemCreate(BaseModel):
 
 class WorkOrderItemResponse(BaseModel):
     id: UUID
-    product_id: UUID
+    product_id: Optional[UUID] = None
     product_name: str
     product_type: str
+    is_virtual: bool = False
     quantity: Decimal
     unit_price: Decimal
     consumption_rate: Decimal = Decimal('1.0')
