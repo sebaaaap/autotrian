@@ -68,8 +68,8 @@ function encodeCode128(text: string): number[] {
     return seq;
 }
 
-function BarcodeSVG({ value, height = 40, moduleWidth = 1.4, showText = true }: {
-    value: string; height?: number; moduleWidth?: number; showText?: boolean;
+function BarcodeSVG({ value, height = 40, moduleWidth = 1.4, showText = true, textFontSize }: {
+    value: string; height?: number; moduleWidth?: number; showText?: boolean; textFontSize?: number;
 }) {
     const seq = useMemo(() => encodeCode128(value), [value]);
     // Convertir secuencia [bar, space, ...] a rects
@@ -82,7 +82,7 @@ function BarcodeSVG({ value, height = 40, moduleWidth = 1.4, showText = true }: 
         x += barW + spaceW;
     }
     const totalW = x;
-    const textH = showText ? 12 : 0;
+    const textH = showText ? Math.max(12, (textFontSize || 9) + 2) : 0;
     // Quiet zone: mínimo 10 módulos a cada lado (exigencia de scanners Code 128)
     const quiet = 10 * moduleWidth;
 
@@ -103,8 +103,9 @@ function BarcodeSVG({ value, height = 40, moduleWidth = 1.4, showText = true }: 
                     x={totalW / 2}
                     y={height + textH - 2}
                     textAnchor="middle"
-                    fontSize={textH - 3}
+                    fontSize={textFontSize || textH - 3}
                     fontFamily="monospace"
+                    fontWeight={600}
                     fill="black"
                 >
                     {value}
@@ -150,7 +151,7 @@ const LABEL_PRESETS = [
 const escapeHtml = (s: string) =>
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-function barcodeSvgString(value: string, height: number, moduleWidth: number, showText: boolean): string {
+function barcodeSvgString(value: string, height: number, moduleWidth: number, showText: boolean, textFontSize?: number): string {
     const seq = encodeCode128(value);
     const bars: string[] = [];
     let x = 0;
@@ -161,10 +162,10 @@ function barcodeSvgString(value: string, height: number, moduleWidth: number, sh
         x += barW + spaceW;
     }
     const totalW = x;
-    const textH = showText ? 12 : 0;
+    const textH = showText ? Math.max(12, (textFontSize || 9) + 2) : 0;
     const quiet = 10 * moduleWidth;
     const text = showText
-        ? `<text x="${totalW / 2}" y="${height + textH - 2}" text-anchor="middle" font-size="${textH - 3}" font-family="monospace" fill="black">${escapeHtml(value)}</text>`
+        ? `<text x="${totalW / 2}" y="${height + textH - 2}" text-anchor="middle" font-size="${textFontSize || textH - 3}" font-family="monospace" font-weight="600" fill="black">${escapeHtml(value)}</text>`
         : "";
     return (
         `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" ` +
@@ -182,8 +183,9 @@ function buildPrintHtml(opts: {
     nameSize: number;
     refSize: number;
     barcodeH: number;
+    bigBarcodeText?: boolean;
 }): string {
-    const { labels, fields, dims, nameSize, refSize, barcodeH } = opts;
+    const { labels, fields, dims, nameSize, refSize, barcodeH, bigBarcodeText } = opts;
     const showText = dims.h >= 25;
 
     const pages = labels.map(p => {
@@ -196,12 +198,12 @@ function buildPrintHtml(opts: {
               `</div>`
             : "";
         const barcode = fields.barcode
-            ? `<div class="bc-wrap">${barcodeSvgString(p.barcode, barcodeH, 1.05, showText)}</div>`
+            ? `<div class="bc-wrap">${barcodeSvgString(p.barcode, barcodeH, 1.05, showText, bigBarcodeText ? 10 : undefined)}</div>`
             : "";
         const category = fields.category && p.category_name
             ? `<div class="t-cat" style="font-size:${refSize}pt">${escapeHtml(p.category_name)}</div>`
             : "";
-        return `<div class="label-page">${header}${barcode}${category}</div>`;
+        return `<div class="label-page${bigBarcodeText ? " big" : ""}">${header}${barcode}${category}</div>`;
     }).join("");
 
     return `<!doctype html>
@@ -227,9 +229,11 @@ function buildPrintHtml(opts: {
     }
     .label-page:last-child { page-break-after: auto; }
     .hdr { text-align: center; line-height: 1; min-height: 0; }
+    .label-page.big .t-name { text-wrap: balance; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .label-page.big .t-ref { text-wrap: balance; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .t-name { font-weight: 700; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .t-ref { color: #444; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .t-cat { color: #444; text-align: center; line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .t-ref { color: #444; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .t-cat { color: #444; text-align: center; line-height: 1.1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .bc-wrap { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
     .bc-wrap svg { width: 100%; height: 100%; }
 </style>
@@ -286,10 +290,11 @@ export function LabelGenerator({
     const pxW = dims.w * 3.78;
     const pxH = dims.h * 3.78;
 
-    // 80×45 (papel del cliente): texto grande — nombre 12pt, ref/categoría 9pt
+    // 80×45 (papel del cliente): texto BIEN grande — nombre 16pt (hasta 2 líneas),
+    // ref/categoría 11pt; el barcode absorbe el alto restante y sigue legible
     const bigText = dims.w >= 80 && dims.h >= 45;
-    const nameSize = bigText ? 12 : dims.h >= 30 ? 8 : 6.5;
-    const refSize = bigText ? 9 : dims.h >= 30 ? 6.5 : 5.5;
+    const nameSize = bigText ? 16 : dims.h >= 30 ? 8 : 6.5;
+    const refSize = bigText ? 11 : dims.h >= 30 ? 6.5 : 5.5;
     // Altura de barras: barcode-only ocupa casi toda la etiqueta
     const barcodeOnly = !fields.name && !fields.internal_reference && !fields.category;
     const barcodeH = barcodeOnly ? Math.max(50, dims.h * 2.4) : Math.max(35, dims.h * 1.4);
@@ -303,7 +308,7 @@ export function LabelGenerator({
         });
         if (labels.length === 0) return;
 
-        const html = buildPrintHtml({ labels, fields, dims, nameSize, refSize, barcodeH });
+        const html = buildPrintHtml({ labels, fields, dims, nameSize, refSize, barcodeH, bigBarcodeText: bigText });
 
         // Iframe oculto fuera de pantalla: documento aislado (about:srcdoc)
         let iframe = iframeRef.current;
@@ -444,12 +449,26 @@ export function LabelGenerator({
                                         {(fields.name || fields.internal_reference) && (
                                             <div className="text-center leading-none min-h-0">
                                                 {fields.name && (
-                                                    <div className="font-bold truncate" style={{ fontSize: `${nameSize}pt` }}>
+                                                    <div className="font-bold" style={{
+                                                        fontSize: `${nameSize}pt`,
+                                                        display: "-webkit-box",
+                                                        WebkitLineClamp: bigText ? 2 : 1,
+                                                        WebkitBoxOrient: "vertical",
+                                                        overflow: "hidden",
+                                                        textWrap: "balance",
+                                                    }}>
                                                         {selectedList[0].name}
                                                     </div>
                                                 )}
                                                 {fields.internal_reference && selectedList[0].internal_reference && (
-                                                    <div className="truncate text-gray-600" style={{ fontSize: `${refSize}pt` }}>
+                                                    <div className="text-gray-600" style={{
+                                                        fontSize: `${refSize}pt`,
+                                                        display: "-webkit-box",
+                                                        WebkitLineClamp: 2,
+                                                        WebkitBoxOrient: "vertical",
+                                                        overflow: "hidden",
+                                                        textWrap: "balance",
+                                                    }}>
                                                         {selectedList[0].internal_reference}
                                                     </div>
                                                 )}
@@ -457,7 +476,7 @@ export function LabelGenerator({
                                         )}
                                         {fields.barcode && (
                                             <div className="flex-1 flex items-center justify-center min-h-0">
-                                                <BarcodeSVG value={selectedList[0].barcode} height={barcodeH} moduleWidth={1.05} showText={dims.h >= 25} />
+                                                <BarcodeSVG value={selectedList[0].barcode} height={barcodeH} moduleWidth={1.05} showText={dims.h >= 25} textFontSize={bigText ? 10 : undefined} />
                                             </div>
                                         )}
                                         {fields.category && selectedList[0].category_name && (
