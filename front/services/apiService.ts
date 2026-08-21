@@ -270,6 +270,16 @@ export const apiService = {
         return response.data;
     },
 
+    async deleteCustomer(id: string): Promise<any> {
+        const response = await api.delete(`/customers/${id}`);
+        return response.data;
+    },
+
+    async deleteVehicle(id: string): Promise<any> {
+        const response = await api.delete(`/customers/vehicles/${id}`);
+        return response.data;
+    },
+
     async getCustomerHistory(id: string): Promise<any> {
         const response = await api.get(`/customers/${id}/history`);
         return response.data;

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional
 from app.api.deps import get_tenant_session
 from app.db.tenant_session import TenantSession
-from app.models.base import Customer, Vehicle, Ticket, SaleState, VehicleType
+from app.models.base import Customer, Vehicle, Ticket, SaleState, VehicleType, Quote, WorkOrder
 from app.schemas.customers import CustomerCreate, CustomerUpdate, CustomerResponse, VehicleCreate, VehicleUpdate, VehicleResponse
 from sqlalchemy import func, desc
 from app.api.deps import check_roles
@@ -20,7 +20,8 @@ def get_customers(
     db: TenantSession = Depends(get_tenant_session),
     current_user = Depends(check_roles(["admin", "vendedor"]))
 ):
-    query = db.tenant_query(Customer)
+    # Solo clientes activos: los eliminados con historial quedan ocultos
+    query = db.tenant_query(Customer).filter(Customer.is_active != False)
     if q:
         query = query.filter(
             (Customer.name.ilike(f"%{q}%")) | 
@@ -34,10 +35,14 @@ def create_customer(
     db: TenantSession = Depends(get_tenant_session),
     current_user = Depends(check_roles(["admin", "vendedor"]))
 ):
-    # Check if RUT already exists
-    existing = db.tenant_query(Customer).filter(Customer.rut == customer.rut).first()
+    # Check if RUT already exists (dentro de la empresa; un RUT de un cliente
+    # eliminado con historial puede re-registrarse como cliente nuevo)
+    existing = db.tenant_query(Customer).filter(
+        Customer.rut == customer.rut,
+        Customer.is_active != False
+    ).first()
     if existing:
-        raise HTTPException(status_code=400, detail="El RUT ya está registrado")
+        raise HTTPException(status_code=400, detail=f"El RUT ya está registrado: {existing.name}")
     
     db_customer = Customer(**customer.dict())
     db.add(db_customer)
@@ -53,33 +58,86 @@ def get_customer(customer_id: UUID, db: TenantSession = Depends(get_tenant_sessi
     return db_customer
 
 @router.put("/{customer_id}", response_model=CustomerResponse)
-def update_customer(customer_id: UUID, customer: CustomerUpdate, db: TenantSession = Depends(get_tenant_session)):
+def update_customer(
+    customer_id: UUID,
+    customer: CustomerUpdate,
+    db: TenantSession = Depends(get_tenant_session),
+    current_user = Depends(check_roles(["admin", "vendedor"]))
+):
     db_customer = db.tenant_query(Customer).filter(Customer.id == customer_id).first()
     if not db_customer:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
-    
+
     update_data = customer.dict(exclude_unset=True)
+
+    # RUT: validar duplicado dentro de la empresa (excluyéndose a sí mismo)
+    if update_data.get("rut") and update_data["rut"] != db_customer.rut:
+        dup = db.tenant_query(Customer).filter(
+            Customer.rut == update_data["rut"],
+            Customer.id != customer_id
+        ).first()
+        if dup:
+            raise HTTPException(
+                status_code=400,
+                detail=f"El RUT '{update_data['rut']}' ya pertenece a otro cliente: {dup.name}"
+            )
+
     for key, value in update_data.items():
         setattr(db_customer, key, value)
-    
+
     db.commit()
     db.refresh(db_customer)
     return db_customer
 
 @router.delete("/{customer_id}")
-def delete_customer(customer_id: UUID, db: TenantSession = Depends(get_tenant_session)):
+def delete_customer(
+    customer_id: UUID,
+    db: TenantSession = Depends(get_tenant_session),
+    current_user = Depends(check_roles(["admin"]))
+):
     db_customer = db.tenant_query(Customer).filter(Customer.id == customer_id).first()
     if not db_customer:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
-    
+
+    # Borrado físico solo si NO tiene historial comercial (FKs).
+    # Ticket.customer_id / Quote.customer_id / WorkOrder.customer_id son NOT NULL
+    # en OTs y cotizaciones → no se pueden desvincular sin corromper el registro.
+    has_history = (
+        db.tenant_query(Ticket).filter(Ticket.customer_id == customer_id).first() is not None
+        or db.tenant_query(Quote).filter(Quote.customer_id == customer_id).first() is not None
+        or db.tenant_query(WorkOrder).filter(WorkOrder.customer_id == customer_id).first() is not None
+    )
+
+    if has_history:
+        # Borrado lógico: anonimiza pero preserva integridad de ventas/OTs/cotizaciones.
+        db_customer.name = f"Cliente eliminado ({str(customer_id)[:8]})"
+        db_customer.rut = f"DEL-{customer_id}"
+        db_customer.phone = None
+        db_customer.email = None
+        db_customer.address = None
+        db_customer.is_active = False
+        db.commit()
+        return {
+            "status": "ok",
+            "mode": "soft",
+            "detail": "Cliente con historial: se ocultó del catálogo preservando sus ventas, OTs y cotizaciones."
+        }
+
+    # Sin historial: borrar también sus vehículos y el cliente físicamente.
+    db.tenant_query(Vehicle).filter(Vehicle.customer_id == customer_id).delete(synchronize_session=False)
     db.delete(db_customer)
     db.commit()
-    return {"status": "ok"}
+    return {"status": "ok", "mode": "hard", "detail": "Cliente eliminado"}
 
 # --- Vehicles ---
 
 @router.post("/{customer_id}/vehicles", response_model=VehicleResponse)
-def add_vehicle(customer_id: UUID, vehicle: VehicleCreate, db: TenantSession = Depends(get_tenant_session)):
+def add_vehicle(
+    customer_id: UUID,
+    vehicle: VehicleCreate,
+    db: TenantSession = Depends(get_tenant_session),
+    current_user = Depends(check_roles(["admin", "vendedor"]))
+):
     db_customer = db.tenant_query(Customer).filter(Customer.id == customer_id).first()
     if not db_customer:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
@@ -87,7 +145,11 @@ def add_vehicle(customer_id: UUID, vehicle: VehicleCreate, db: TenantSession = D
     # Check if plate already exists
     existing = db.tenant_query(Vehicle).filter(Vehicle.license_plate == vehicle.license_plate).first()
     if existing:
-        raise HTTPException(status_code=400, detail="La patente ya está registrada")
+        owner = existing.owner
+        raise HTTPException(
+            status_code=400,
+            detail=f"La patente ya está registrada: {owner.name if owner else 'cliente eliminado'}"
+        )
     
     db_vehicle = Vehicle(**vehicle.dict(exclude={"customer_id"}), customer_id=customer_id)
     db.add(db_vehicle)
@@ -103,12 +165,30 @@ def get_vehicle(vehicle_id: UUID, db: TenantSession = Depends(get_tenant_session
     return db_vehicle
 
 @router.put("/vehicles/{vehicle_id}", response_model=VehicleResponse)
-def update_vehicle(vehicle_id: UUID, vehicle: VehicleUpdate, db: TenantSession = Depends(get_tenant_session)):
+def update_vehicle(
+    vehicle_id: UUID,
+    vehicle: VehicleUpdate,
+    db: TenantSession = Depends(get_tenant_session),
+    current_user = Depends(check_roles(["admin", "vendedor"]))
+):
     db_vehicle = db.tenant_query(Vehicle).filter(Vehicle.id == vehicle_id).first()
     if not db_vehicle:
         raise HTTPException(status_code=404, detail="Vehículo no encontrado")
     
     update_data = vehicle.dict(exclude_unset=True)
+
+    # Patente: validar duplicado (excluyéndose a sí misma)
+    if update_data.get("license_plate") and update_data["license_plate"] != db_vehicle.license_plate:
+        dup = db.tenant_query(Vehicle).filter(
+            Vehicle.license_plate == update_data["license_plate"],
+            Vehicle.id != vehicle_id
+        ).first()
+        if dup:
+            raise HTTPException(
+                status_code=400,
+                detail=f"La patente '{update_data['license_plate']}' ya pertenece a otro vehículo"
+            )
+
     for key, value in update_data.items():
         setattr(db_vehicle, key, value)
     
@@ -117,14 +197,31 @@ def update_vehicle(vehicle_id: UUID, vehicle: VehicleUpdate, db: TenantSession =
     return db_vehicle
 
 @router.delete("/vehicles/{vehicle_id}")
-def delete_vehicle(vehicle_id: UUID, db: TenantSession = Depends(get_tenant_session)):
+def delete_vehicle(
+    vehicle_id: UUID,
+    db: TenantSession = Depends(get_tenant_session),
+    current_user = Depends(check_roles(["admin"]))
+):
     db_vehicle = db.tenant_query(Vehicle).filter(Vehicle.id == vehicle_id).first()
     if not db_vehicle:
         raise HTTPException(status_code=404, detail="Vehículo no encontrado")
     
+    # Desvincular historial: Ticket/Quote/WorkOrder.vehicle_id son nullable=True,
+    # así que las referencias quedan sin vehículo (muestra "N/A") y el registro
+    # comercial se preserva. Luego borrado físico (libera la patente unique).
+    db.tenant_query(Ticket).filter(Ticket.vehicle_id == vehicle_id).update(
+        {Ticket.vehicle_id: None}, synchronize_session=False
+    )
+    db.tenant_query(Quote).filter(Quote.vehicle_id == vehicle_id).update(
+        {Quote.vehicle_id: None}, synchronize_session=False
+    )
+    db.tenant_query(WorkOrder).filter(WorkOrder.vehicle_id == vehicle_id).update(
+        {WorkOrder.vehicle_id: None}, synchronize_session=False
+    )
+
     db.delete(db_vehicle)
     db.commit()
-    return {"status": "ok"}
+    return {"status": "ok", "mode": "hard", "detail": "Vehículo eliminado (su historial comercial se preserva sin patente)"}
 
 # --- Stats / History ---
 from app.models.base import WorkOrder, SaleItem, WorkOrderItem
@@ -378,9 +475,28 @@ def quick_create_customer_vehicle(
     """
     plate = payload.license_plate.upper().strip()
 
-    # Si ya existe la patente, retornar el vehículo y su dueño
+    # Detectar si contact es email o teléfono (antes del early-return de patente existente)
+    contact = payload.contact.strip()
+    is_email = "@" in contact
+    phone = None if is_email else contact
+    email = contact if is_email else None
+
+    # Si ya existe la patente, retornar el vehículo y su dueño.
+    # Si el dueño fue eliminado (soft delete), reactivarlo con los datos nuevos:
+    # el taller recupera al cliente histórico en vez de mostrar "Cliente eliminado".
     existing_vehicle = db.tenant_query(Vehicle).filter(Vehicle.license_plate == plate).first()
     if existing_vehicle:
+        owner = existing_vehicle.owner
+        if owner and owner.is_active is False:
+            owner.is_active = True
+            if payload.customer_name:
+                owner.name = payload.customer_name
+            if phone:
+                owner.phone = phone
+            if email:
+                owner.email = email
+            db.commit()
+            db.refresh(owner)
         return {
             "created": False,
             "customer": {
@@ -397,18 +513,13 @@ def quick_create_customer_vehicle(
             }
         }
 
-    # Detectar si contact es email o teléfono
-    contact = payload.contact.strip()
-    is_email = "@" in contact
-    phone = None if is_email else contact
-    email = contact if is_email else None
-
     # Usar la patente como RUT temporal si no se proporciona RUT
     rut_temp = f"PLACA-{plate}"
 
-    # Crear cliente (verificar si ya existe por nombre+contacto)
+    # Crear cliente (verificar si ya existe por nombre+contacto; ignorar eliminados)
     customer = db.tenant_query(Customer).filter(
-        Customer.rut == rut_temp
+        Customer.rut == rut_temp,
+        Customer.is_active != False
     ).first()
 
     if not customer:

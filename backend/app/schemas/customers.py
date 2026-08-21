@@ -62,6 +62,7 @@ class CustomerUpdate(BaseModel):
 
 class CustomerResponse(CustomerBase):
     id: UUID
+    is_active: bool = True
     vehicles: List[VehicleResponse] = []
     
     class Config:

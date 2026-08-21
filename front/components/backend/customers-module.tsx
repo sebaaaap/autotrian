@@ -72,6 +72,9 @@ export default function CustomersModule({ onBack }: CustomersModuleProps) {
     const [selectedQuote, setSelectedQuote] = useState<any>(null);
     const [selectedVehicleForSticker, setSelectedVehicleForSticker] = useState<any>(null);
     const [showPrintPreview, setShowPrintPreview] = useState(false);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isEditVehicleModalOpen, setIsEditVehicleModalOpen] = useState(false);
+    const [vehicleToEdit, setVehicleToEdit] = useState<any>(null);
 
     const { generateAndDownloadPDF, handleWhatsAppShare, handleEmailShare } = usePdfShare();
 
@@ -82,6 +85,23 @@ export default function CustomersModule({ onBack }: CustomersModuleProps) {
         phone: "",
         email: "",
         address: ""
+    });
+
+    const [editCustomer, setEditCustomer] = useState({
+        name: "",
+        rut: "",
+        phone: "",
+        email: "",
+        address: ""
+    });
+
+    const [editVehicle, setEditVehicle] = useState({
+        license_plate: "",
+        brand: "",
+        model: "",
+        year: new Date().getFullYear(),
+        vehicle_type: "automovil",
+        color: ""
     });
 
     const [newVehicle, setNewVehicle] = useState({
@@ -141,6 +161,95 @@ export default function CustomersModule({ onBack }: CustomersModuleProps) {
             mutate();
         } catch (error: any) {
             toast.error(error.response?.data?.detail || "Error al agregar vehículo");
+        }
+    };
+
+    const openEditCustomerModal = () => {
+        if (!selectedCustomer) return;
+        setEditCustomer({
+            name: selectedCustomer.name || "",
+            rut: selectedCustomer.rut || "",
+            phone: selectedCustomer.phone || "",
+            email: selectedCustomer.email || "",
+            address: selectedCustomer.address || ""
+        });
+        setIsEditModalOpen(true);
+    };
+
+    const handleUpdateCustomer = async () => {
+        try {
+            if (!editCustomer.name || !editCustomer.rut) {
+                toast.error("Nombre y RUT son obligatorios");
+                return;
+            }
+            await apiService.updateCustomer(selectedCustomer.id, editCustomer);
+            toast.success("Cliente actualizado correctamente");
+            setIsEditModalOpen(false);
+            const updated = await apiService.getCustomers(editCustomer.rut);
+            if (updated.length > 0) setSelectedCustomer(updated[0]);
+            mutate();
+        } catch (error: any) {
+            toast.error(error.response?.data?.detail || "Error al actualizar cliente");
+        }
+    };
+
+    const handleDeleteCustomer = async () => {
+        if (!selectedCustomer) return;
+        const hasVehicles = (selectedCustomer.vehicles?.length || 0) > 0;
+        const msg = hasVehicles
+            ? `¿Eliminar a "${selectedCustomer.name}"?\n\nSe eliminarán también sus ${selectedCustomer.vehicles.length} vehículo(s). Si tiene ventas, OTs o cotizaciones, se ocultará del catálogo preservando su historial.`
+            : `¿Eliminar a "${selectedCustomer.name}"?\n\nSi tiene ventas, OTs o cotizaciones, se ocultará del catálogo preservando su historial.`;
+        if (!confirm(msg)) return;
+        try {
+            const res = await apiService.deleteCustomer(selectedCustomer.id);
+            toast.success(res?.detail || "Cliente eliminado correctamente");
+            setSelectedCustomer(null);
+            mutate();
+        } catch (error: any) {
+            toast.error(error.response?.data?.detail || "Error al eliminar cliente");
+        }
+    };
+
+    const openEditVehicleModal = (v: any) => {
+        setVehicleToEdit(v);
+        setEditVehicle({
+            license_plate: v.license_plate || "",
+            brand: v.brand || "",
+            model: v.model || "",
+            year: v.year || new Date().getFullYear(),
+            vehicle_type: v.vehicle_type || "automovil",
+            color: v.color || ""
+        });
+        setIsEditVehicleModalOpen(true);
+    };
+
+    const handleUpdateVehicle = async () => {
+        try {
+            if (!editVehicle.license_plate) {
+                toast.error("La patente es obligatoria");
+                return;
+            }
+            await apiService.updateVehicle(vehicleToEdit.id, editVehicle);
+            toast.success("Vehículo actualizado correctamente");
+            setIsEditVehicleModalOpen(false);
+            const updated = await apiService.getCustomers(selectedCustomer.rut);
+            if (updated.length > 0) setSelectedCustomer(updated[0]);
+            mutate();
+        } catch (error: any) {
+            toast.error(error.response?.data?.detail || "Error al actualizar vehículo");
+        }
+    };
+
+    const handleDeleteVehicle = async (v: any) => {
+        if (!confirm(`¿Eliminar el vehículo ${v.license_plate}?\n\nSu historial de servicios se conserva en las ventas y OTs asociadas.`)) return;
+        try {
+            const res = await apiService.deleteVehicle(v.id);
+            toast.success(res?.detail || "Vehículo eliminado correctamente");
+            const updated = await apiService.getCustomers(selectedCustomer.rut);
+            if (updated.length > 0) setSelectedCustomer(updated[0]);
+            mutate();
+        } catch (error: any) {
+            toast.error(error.response?.data?.detail || "Error al eliminar vehículo");
         }
     };
 
@@ -284,10 +393,16 @@ export default function CustomersModule({ onBack }: CustomersModuleProps) {
                                     )}
                                 </div>
                             </div>
-                            <Button variant="outline" size="sm">
-                                <Edit className="w-4 h-4 mr-2" />
-                                Editar Perfil
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                <Button variant="outline" size="sm" onClick={openEditCustomerModal}>
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    Editar Perfil
+                                </Button>
+                                <Button variant="outline" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={handleDeleteCustomer}>
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Eliminar
+                                </Button>
+                            </div>
                         </div>
 
                         <Tabs defaultValue="overview" className="space-y-6">
@@ -386,10 +501,10 @@ export default function CustomersModule({ onBack }: CustomersModuleProps) {
                                                         <td className="px-4 py-3 uppercase">{v.brand} {v.model}</td>
                                                         <td className="px-4 py-3">{v.color || '-'} / {v.year}</td>
                                                         <td className="px-4 py-3 text-right">
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditVehicleModal(v)} title="Editar vehículo">
                                                                 <Edit className="w-4 h-4" />
                                                             </Button>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteVehicle(v)} title="Eliminar vehículo">
                                                                 <Trash2 className="w-4 h-4" />
                                                             </Button>
                                                         </td>
@@ -1003,6 +1118,144 @@ export default function CustomersModule({ onBack }: CustomersModuleProps) {
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>Cancelar</Button>
                         <Button onClick={handleCreateCustomer}>Crear Cliente</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Modal: Edit Customer */}
+            <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+                <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                        <DialogTitle>Editar Cliente</DialogTitle>
+                        <DialogDescription>
+                            Modifica los datos del cliente. El RUT no puede duplicar el de otro cliente.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <label className="text-right text-sm font-semibold">Nombre</label>
+                            <Input
+                                className="col-span-3"
+                                value={editCustomer.name}
+                                onChange={(e) => setEditCustomer({ ...editCustomer, name: e.target.value })}
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <label className="text-right text-sm font-semibold">RUT</label>
+                            <Input
+                                className="col-span-3 font-mono"
+                                value={editCustomer.rut}
+                                onChange={(e) => setEditCustomer({ ...editCustomer, rut: e.target.value })}
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <label className="text-right text-sm font-semibold">Teléfono</label>
+                            <Input
+                                className="col-span-3"
+                                value={editCustomer.phone || ""}
+                                onChange={(e) => setEditCustomer({ ...editCustomer, phone: e.target.value })}
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <label className="text-right text-sm font-semibold">Email</label>
+                            <Input
+                                className="col-span-3"
+                                value={editCustomer.email || ""}
+                                onChange={(e) => setEditCustomer({ ...editCustomer, email: e.target.value })}
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <label className="text-right text-sm font-semibold">Dirección</label>
+                            <Input
+                                className="col-span-3"
+                                value={editCustomer.address || ""}
+                                onChange={(e) => setEditCustomer({ ...editCustomer, address: e.target.value })}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>Cancelar</Button>
+                        <Button onClick={handleUpdateCustomer}>Guardar Cambios</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Modal: Edit Vehicle */}
+            <Dialog open={isEditVehicleModalOpen} onOpenChange={setIsEditVehicleModalOpen}>
+                <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                        <DialogTitle>Editar Vehículo {vehicleToEdit?.license_plate}</DialogTitle>
+                        <DialogDescription>
+                            Modifica los datos del vehículo. La patente no puede duplicar la de otro vehículo.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <label className="text-right text-sm font-semibold">Patente</label>
+                            <Input
+                                className="col-span-3 font-mono font-bold uppercase text-lg"
+                                value={editVehicle.license_plate}
+                                onChange={(e) => setEditVehicle({ ...editVehicle, license_plate: e.target.value.toUpperCase() })}
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <label className="text-right text-sm font-semibold">Tipo</label>
+                            <div className="col-span-3">
+                                <Select
+                                    value={editVehicle.vehicle_type}
+                                    onValueChange={(v) => setEditVehicle({ ...editVehicle, vehicle_type: v })}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Seleccionar tipo" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="automovil">Automóvil</SelectItem>
+                                        <SelectItem value="motocicleta">Motocicleta</SelectItem>
+                                        <SelectItem value="camion">Camión</SelectItem>
+                                        <SelectItem value="furgon">Furgón / Bus</SelectItem>
+                                        <SelectItem value="camioneta">Camioneta (Pickup)</SelectItem>
+                                        <SelectItem value="otro">Otro</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <label className="text-right text-sm font-semibold">Marca</label>
+                            <Input
+                                className="col-span-3"
+                                value={editVehicle.brand || ""}
+                                onChange={(e) => setEditVehicle({ ...editVehicle, brand: e.target.value })}
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <label className="text-right text-sm font-semibold">Modelo</label>
+                            <Input
+                                className="col-span-3"
+                                value={editVehicle.model || ""}
+                                onChange={(e) => setEditVehicle({ ...editVehicle, model: e.target.value })}
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <label className="text-right text-sm font-semibold">Año</label>
+                            <Input
+                                type="number"
+                                className="col-span-3"
+                                value={editVehicle.year || ""}
+                                onChange={(e) => setEditVehicle({ ...editVehicle, year: parseInt(e.target.value) || new Date().getFullYear() })}
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <label className="text-right text-sm font-semibold">Color</label>
+                            <Input
+                                className="col-span-3"
+                                value={editVehicle.color || ""}
+                                onChange={(e) => setEditVehicle({ ...editVehicle, color: e.target.value })}
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsEditVehicleModalOpen(false)}>Cancelar</Button>
+                        <Button onClick={handleUpdateVehicle}>Guardar Cambios</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

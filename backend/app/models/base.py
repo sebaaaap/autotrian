@@ -273,29 +273,38 @@ class Customer(TenantModel):
     __tablename__ = "customers"
     
     name = Column(String, index=True, nullable=False)
-    rut = Column(String, unique=True, index=True, nullable=False) # rut_cliente
+    rut = Column(String, index=True, nullable=False) # rut_cliente (unique POR EMPRESA)
     address = Column(String, nullable=True)
     phone = Column(String, nullable=True)
     email = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True)  # soft delete: False = eliminado del catálogo
     
     vehicles = relationship("Vehicle", back_populates="owner", cascade="all, delete-orphan")
     tickets = relationship("Ticket", back_populates="customer")
+    
+    __table_args__ = (
+        UniqueConstraint('company_id', 'rut', name='uix_customer_company_rut'),
+    )
 
 class Vehicle(TenantModel):
     __tablename__ = "vehicles"
     
-    license_plate = Column(String, unique=True, index=True, nullable=False)
+    license_plate = Column(String, index=True, nullable=False)  # unique POR EMPRESA
     brand = Column(String, nullable=True)
     model = Column(String, nullable=True)
     year = Column(Integer, nullable=True)
     vehicle_type = Column(Enum(VehicleType), default=VehicleType.automovil)
     color = Column(String, nullable=True)
     vin = Column(String, nullable=True)
-    service_info = Column(JSON, nullable=True) # Datos de lubricentro
+    service_info = Column(JSON, nullable=True)  # Datos de lubricentro
     
     customer_id = Column(UUID(as_uuid=True), ForeignKey("customers.id"), nullable=False)
     owner = relationship("Customer", back_populates="vehicles")
     tickets = relationship("Ticket", back_populates="vehicle")
+    
+    __table_args__ = (
+        UniqueConstraint('company_id', 'license_plate', name='uix_vehicle_company_plate'),
+    )
 
 class Ticket(TenantModel):
     __tablename__ = "tickets"
