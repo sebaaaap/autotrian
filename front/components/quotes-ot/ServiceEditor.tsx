@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Search, Car, User, Clock, CheckCircle, FileText, Send, Printer, X, ShoppingCart, Wrench, Download, Mail, Share2, ChevronDown, ChevronUp, Droplet } from "lucide-react"
+import { Search, Car, User, Clock, CheckCircle, FileText, Send, Printer, X, ShoppingCart, Wrench, Download, Mail, Share2, ChevronDown, ChevronUp, Droplet, Sparkles } from "lucide-react"
 import { apiService } from "@/services/apiService"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
@@ -21,6 +21,7 @@ export type LineItem = {
     quantity: number
     price: number
     isService: boolean
+    isVirtual?: boolean
 }
 
 export function ServiceEditor() {
@@ -40,10 +41,11 @@ export function ServiceEditor() {
     const [apiCustomers, setApiCustomers] = useState<any[]>([])
 
     // New item selection (Single Column)
-    const [addingType, setAddingType] = useState<"STORABLE" | "SERVICE">("STORABLE")
+    const [addingType, setAddingType] = useState<"STORABLE" | "SERVICE" | "TARGET">("STORABLE")
     const [selectedItemId, setSelectedItemId] = useState("")
     const [itemPrice, setItemPrice] = useState("")
     const [itemQuantity, setItemQuantity] = useState("1")
+    const [targetName, setTargetName] = useState("")
 
     // Dialog state
     const [showSuccessModal, setShowSuccessModal] = useState(false)
@@ -90,6 +92,31 @@ export function ServiceEditor() {
     }, [items])
 
     const handleAddItem = () => {
+        if (addingType === "TARGET") {
+            const name = targetName.trim()
+            if (!name) {
+                toast.error("Escribe un nombre para el target")
+                return
+            }
+            const price = Number(itemPrice) || 0
+            const qty = Number(itemQuantity) || 1
+            const newItem: LineItem = {
+                id: Date.now().toString(),
+                product_id: "",
+                name,
+                quantity: qty,
+                price,
+                isService: false,
+                isVirtual: true
+            }
+            setItems(prev => [...prev, newItem])
+            toast.success(`Target añadido: ${name}`)
+            setTargetName("")
+            setItemPrice("")
+            setItemQuantity("1")
+            return
+        }
+
         if (!selectedItemId) {
             toast.error("Selecciona un producto o servicio")
             return
@@ -138,6 +165,10 @@ export function ServiceEditor() {
         setItems(items.map(item => item.id === id ? { ...item, price: Number(newPrice) } : item))
     }
 
+    const handleUpdateName = (id: string, newName: string) => {
+        setItems(items.map(item => item.id === id ? { ...item, name: newName } : item))
+    }
+
     const handleSave = async () => {
         if (items.length === 0) {
             toast.error("Agrega al menos un ítem a la cotización/OT")
@@ -162,7 +193,9 @@ export function ServiceEditor() {
                 vehicle_id: selectedVehicle ? selectedVehicle.id : null,
                 mileage: km ? Number(km) : null,
                 items: items.map(i => ({
-                    product_id: i.product_id,
+                    product_id: i.isVirtual ? null : i.product_id,
+                    virtual_name: i.isVirtual ? i.name : null,
+                    is_virtual: !!i.isVirtual,
                     quantity: i.quantity,
                     unit_price: i.price
                 })),
@@ -396,10 +429,10 @@ export function ServiceEditor() {
                                 <div className="lg:col-span-6 space-y-2">
                                     <div className="flex items-center justify-between">
                                         <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                                            Busca un {addingType === 'SERVICE' ? 'Servicio' : 'Producto'}
+                                            Busca un {addingType === 'SERVICE' ? 'Servicio' : addingType === 'TARGET' ? 'Target (producto de fantasía)' : 'Producto'}
                                         </label>
                                         
-                                        {/* Switch de Tipo (Producto vs Servicio) Movido Aquí */}
+                                        {/* Switch de Tipo (Producto vs Servicio vs Target) */}
                                         <div className="flex bg-muted p-0.5 rounded-lg border border-border">
                                             <button
                                                 className={`flex items-center gap-1.5 px-2 py-1 text-[10px] font-bold rounded-md transition-all ${addingType === 'STORABLE' ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
@@ -421,8 +454,28 @@ export function ServiceEditor() {
                                                 <Wrench size={12} />
                                                 Servicio
                                             </button>
+                                            <button
+                                                className={`flex items-center gap-1.5 px-2 py-1 text-[10px] font-bold rounded-md transition-all ${addingType === 'TARGET' ? 'bg-card text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                                                onClick={() => {
+                                                    setAddingType('TARGET')
+                                                    setSelectedItemId("")
+                                                    setItemPrice("")
+                                                }}
+                                            >
+                                                <Sparkles size={12} />
+                                                Target
+                                            </button>
                                         </div>
                                     </div>
+                                    {addingType === "TARGET" ? (
+                                        <input
+                                            type="text"
+                                            className="w-full bg-card border border-primary/30 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none transition-all shadow-sm"
+                                            placeholder="Ej: Neumático 265/70R17 (pedir a proveedor)"
+                                            value={targetName}
+                                            onChange={e => setTargetName(e.target.value)}
+                                        />
+                                    ) : (
                                     <select
                                         className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-primary/20 outline-none transition-all shadow-sm"
                                         value={selectedItemId}
@@ -440,6 +493,7 @@ export function ServiceEditor() {
                                             <option key={p.id} value={p.id}>{p.name} - ${Number(p.price).toLocaleString()}</option>
                                         ))}
                                     </select>
+                                    )}
                                 </div>
 
                                 <div className="lg:col-span-2 space-y-2">
@@ -505,7 +559,11 @@ export function ServiceEditor() {
                                         return (
                                             <tr key={item.id} className="border-b border-border/50 last:border-b-0 group hover:bg-muted/20 transition-colors">
                                                 <td className="px-5 py-4">
-                                                    {item.isService ?
+                                                    {item.isVirtual ?
+                                                        <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-1 rounded flex items-center gap-1.5 w-fit whitespace-nowrap">
+                                                            <Sparkles size={10} /> TARGET
+                                                        </span> :
+                                                        item.isService ?
                                                         <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-1 rounded flex items-center gap-1.5 w-fit whitespace-nowrap">
                                                             <Wrench size={10} /> SERV.
                                                         </span> :
@@ -514,7 +572,18 @@ export function ServiceEditor() {
                                                         </span>
                                                     }
                                                 </td>
-                                                <td className="px-5 py-4 font-bold text-base text-foreground max-w-[300px] truncate">{item.name}</td>
+                                                <td className="px-5 py-4 font-bold text-base text-foreground max-w-[300px]">
+                                                    {item.isVirtual ? (
+                                                        <input
+                                                            type="text"
+                                                            className="w-full bg-muted/40 rounded-lg py-1.5 px-2 text-base font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 border border-transparent focus:border-primary/20"
+                                                            value={item.name}
+                                                            onChange={e => handleUpdateName(item.id, e.target.value)}
+                                                        />
+                                                    ) : (
+                                                        <span className="block truncate">{item.name}</span>
+                                                    )}
+                                                </td>
                                                 <td className="px-5 py-4 text-center">
                                                     <input
                                                         type="number"

@@ -4,7 +4,7 @@ from datetime import datetime
 from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Boolean, Enum, Text, Numeric, JSON, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, declarative_base
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, text
 import sqlalchemy.orm as sqlalchemy_orm
 
 Base = declarative_base()
@@ -352,7 +352,10 @@ class SaleItem(TenantModel):
     __tablename__ = "sale_items"
     
     ticket_id = Column(UUID(as_uuid=True), ForeignKey("tickets.id"), nullable=False)
-    product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=False)
+    # product_id NULL = ítem virtual (target) cobrado como abono/pago de OT.
+    product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=True)
+    virtual_name = Column(String, nullable=True)
+    is_virtual = Column(Boolean, default=False, nullable=False, server_default=text("false"))
     
     quantity = Column(Numeric(12, 4), nullable=False) # Cantidad base vendida
     unit_price = Column(Numeric(12, 2), nullable=False)
@@ -510,7 +513,11 @@ class QuoteItem(TenantModel):
     __tablename__ = "quote_items"
     
     quote_id = Column(UUID(as_uuid=True), ForeignKey("quotes.id"), nullable=False)
-    product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=False)
+    # product_id NULL = ítem virtual ("target"): existe solo en esta cotización,
+    # no es un producto de inventario ni descuenta stock jamás.
+    product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=True)
+    virtual_name = Column(String, nullable=True)
+    is_virtual = Column(Boolean, default=False, nullable=False, server_default=text("false"))
     quantity = Column(Numeric(12, 4), nullable=False)
     unit_price = Column(Numeric(12, 2), nullable=False)
     consumption_rate = Column(Numeric(12, 3), default=1.0)
@@ -522,10 +529,14 @@ class QuoteItem(TenantModel):
 
     @property
     def product_name(self):
+        if self.is_virtual and self.virtual_name:
+            return self.virtual_name
         return self.product.name if self.product else "N/A"
 
     @property
     def product_type(self):
+        if self.is_virtual:
+            return "TARGET"
         if not self.product or not self.product.product_type:
             return "PRODUCTO"
         return "SERVICIO" if self.product.product_type == ProductType.SERVICE else "PRODUCTO"
@@ -603,7 +614,10 @@ class WorkOrderItem(TenantModel):
     __tablename__ = "work_order_items"
     
     work_order_id = Column(UUID(as_uuid=True), ForeignKey("work_orders.id"), nullable=False)
-    product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=False)
+    # product_id NULL = ítem virtual heredado de la cotización (sin stock).
+    product_id = Column(UUID(as_uuid=True), ForeignKey("products.id"), nullable=True)
+    virtual_name = Column(String, nullable=True)
+    is_virtual = Column(Boolean, default=False, nullable=False, server_default=text("false"))
     quantity = Column(Numeric(12, 4), nullable=False)
     unit_price = Column(Numeric(12, 2), nullable=False)
     consumption_rate = Column(Numeric(12, 3), default=1.0)
@@ -618,10 +632,14 @@ class WorkOrderItem(TenantModel):
 
     @property
     def product_name(self):
+        if self.is_virtual and self.virtual_name:
+            return self.virtual_name
         return self.product.name if self.product else "N/A"
 
     @property
     def product_type(self):
+        if self.is_virtual:
+            return "TARGET"
         if not self.product or not self.product.product_type:
             return "PRODUCTO"
         return "SERVICIO" if self.product.product_type == ProductType.SERVICE else "PRODUCTO"

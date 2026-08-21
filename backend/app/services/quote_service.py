@@ -40,6 +40,8 @@ class QuoteWorkOrderService:
             qi = QuoteItem(
                 quote_id=quote.id,
                 product_id=item.product_id,
+                virtual_name=item.virtual_name,
+                is_virtual=item.is_virtual,
                 quantity=item.quantity,
                 unit_price=item.unit_price,
                 consumption_rate=getattr(item, 'consumption_rate', Decimal('1.0')),
@@ -106,6 +108,8 @@ class QuoteWorkOrderService:
                     wo_item = WorkOrderItem(
                         work_order_id=work_order.id,
                         product_id=qi.product_id,
+                        virtual_name=qi.virtual_name,
+                        is_virtual=qi.is_virtual,
                         quantity=qi.quantity,
                         unit_price=qi.unit_price,
                         consumption_rate=qi.consumption_rate,
@@ -133,9 +137,11 @@ class QuoteWorkOrderService:
         db.add(movement)
         db.flush()
 
-        original_product = db.tenant_query(Product).filter(Product.id == wo_item.product_id).first()
+        original_product = db.tenant_query(Product).filter(Product.id == wo_item.product_id).first() if wo_item.product_id else None
         if not original_product:
-            raise HTTPException(status_code=404, detail=f"Producto {wo_item.product_id} no encontrado")
+            # Ítem virtual (target) o producto eliminado: se marca consumido sin stock.
+            wo_item.stock_consumed = True
+            return
 
         # Servicios no descuentan stock
         pt = original_product.product_type
@@ -318,6 +324,8 @@ class QuoteWorkOrderService:
                     sale_item = SI(
                         ticket_id=ticket.id,
                         product_id=woi.product_id,
+                        virtual_name=woi.virtual_name,
+                        is_virtual=woi.is_virtual,
                         quantity=woi.quantity,
                         unit_price=woi.unit_price,
                         subtotal=woi.subtotal,

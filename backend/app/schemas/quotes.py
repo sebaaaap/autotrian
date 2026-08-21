@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 from uuid import UUID
 from datetime import datetime
 from typing import List, Optional
@@ -6,16 +6,30 @@ from decimal import Decimal
 from app.schemas.customers import CustomerResponse, VehicleResponse
 
 class QuoteItemCreate(BaseModel):
-    product_id: UUID
+    product_id: Optional[UUID] = None
+    # Ítem virtual ("target"): línea de cotización sin producto de inventario.
+    # Requiere virtual_name; se puede editar nombre/cantidad/precio libremente.
+    virtual_name: Optional[str] = None
+    is_virtual: bool = False
     quantity: Decimal
     unit_price: Decimal
     consumption_rate: Decimal = Decimal('1.0')
 
+    @model_validator(mode='after')
+    def _validate_item(self):
+        if self.is_virtual or self.product_id is None:
+            if not (self.virtual_name and self.virtual_name.strip()):
+                raise ValueError('Ítem virtual requiere virtual_name')
+            self.is_virtual = True
+            self.product_id = None
+        return self
+
 class QuoteItemResponse(BaseModel):
     id: UUID
-    product_id: UUID
+    product_id: Optional[UUID] = None
     product_name: str
     product_type: str
+    is_virtual: bool = False
     quantity: Decimal
     unit_price: Decimal
     consumption_rate: Decimal = Decimal('1.0')
