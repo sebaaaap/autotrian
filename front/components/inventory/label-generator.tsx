@@ -12,7 +12,7 @@
  */
 
 import { useState, useMemo, useRef } from "react";
-import { Printer, X, Tag } from "lucide-react";
+import { Printer, X, Tag, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 // ── Code 128 encoder (subset B) — SVG puro ────────────────────────────────
@@ -259,6 +259,7 @@ export function LabelGenerator({
     const [customW, setCustomW] = useState(50);
     const [customH, setCustomH] = useState(25);
     const [copiesPerProduct, setCopiesPerProduct] = useState(1);
+    const [productSearch, setProductSearch] = useState("");
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
     if (!open) return null;
@@ -271,6 +272,17 @@ export function LabelGenerator({
     const selectedList = allProducts.filter(p => selected[p.id]);
     const totalLabels = selectedList.reduce((acc, p) => acc + (selected[p.id] || 1) * copiesPerProduct, 0);
 
+    // Buscador inteligente: nombre / código de barras / referencia interna
+    const filteredProducts = useMemo(() => {
+        const q = productSearch.trim().toLowerCase();
+        if (!q) return allProducts;
+        return allProducts.filter(p =>
+            p.name.toLowerCase().includes(q) ||
+            (p.barcode || "").includes(q) ||
+            ((p as any).internal_reference || "").toLowerCase().includes(q)
+        );
+    }, [allProducts, productSearch]);
+
     const toggle = (id: string) => {
         setSelected(prev => {
             const next = { ...prev };
@@ -281,8 +293,9 @@ export function LabelGenerator({
     };
 
     const selectAll = () => {
+        // Selecciona lo visible según el filtro del buscador
         const all: Record<string, number> = {};
-        allProducts.forEach(p => { all[p.id] = 1; });
+        filteredProducts.forEach(p => { all[p.id] = 1; });
         setSelected(all);
     };
 
@@ -426,16 +439,38 @@ export function LabelGenerator({
                                     <Button variant="outline" size="sm" onClick={() => setSelected({})}>Limpiar</Button>
                                 </div>
                             </div>
+                            {/* Buscador inteligente (nombre / código de barras / referencia interna) */}
+                            <div className="relative mb-2">
+                                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar por nombre, código o referencia..."
+                                    className="form-input pl-11"
+                                    value={productSearch}
+                                    onChange={(e) => setProductSearch(e.target.value)}
+                                />
+                                {productSearch && (
+                                    <button
+                                        onClick={() => setProductSearch("")}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                        title="Limpiar búsqueda"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                )}
+                            </div>
                             <div className="max-h-56 overflow-y-auto rounded-xl border border-border divide-y divide-border/50">
-                                {allProducts.map(p => (
+                                {filteredProducts.map(p => (
                                     <label key={p.id} className="flex items-center gap-3 px-3 py-2 hover:bg-muted/50 cursor-pointer text-sm">
                                         <input type="checkbox" checked={!!selected[p.id]} onChange={() => toggle(p.id)} className="h-4 w-4" />
                                         <span className="flex-1 truncate">{p.name}</span>
                                         <span className="text-xs text-muted-foreground font-mono">{p.barcode}</span>
                                     </label>
                                 ))}
-                                {allProducts.length === 0 && (
-                                    <p className="p-4 text-center text-xs text-muted-foreground">Sin productos</p>
+                                {filteredProducts.length === 0 && (
+                                    <p className="p-4 text-center text-xs text-muted-foreground">
+                                        {allProducts.length === 0 ? "Sin productos" : "Sin resultados para esa búsqueda"}
+                                    </p>
                                 )}
                             </div>
                         </div>
