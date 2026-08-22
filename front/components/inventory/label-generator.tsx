@@ -272,16 +272,18 @@ export function LabelGenerator({
     const selectedList = allProducts.filter(p => selected[p.id]);
     const totalLabels = selectedList.reduce((acc, p) => acc + (selected[p.id] || 1) * copiesPerProduct, 0);
 
-    // Buscador inteligente: nombre / código de barras / referencia interna
-    const filteredProducts = useMemo(() => {
-        const q = productSearch.trim().toLowerCase();
-        if (!q) return allProducts;
-        return allProducts.filter(p =>
+    // Buscador inteligente: nombre / código de barras / referencia interna.
+    // Sin useMemo: este punto queda DESPUÉS del early-return del modal, donde
+    // los hooks están prohibidos (Rules of Hooks). products llega ya
+    // memoizado desde el padre y el filter sobre ~cientos de items es trivial.
+    const q = productSearch.trim().toLowerCase();
+    const filteredProducts = !q
+        ? allProducts
+        : allProducts.filter(p =>
             p.name.toLowerCase().includes(q) ||
             (p.barcode || "").includes(q) ||
             ((p as any).internal_reference || "").toLowerCase().includes(q)
         );
-    }, [allProducts, productSearch]);
 
     const toggle = (id: string) => {
         setSelected(prev => {
